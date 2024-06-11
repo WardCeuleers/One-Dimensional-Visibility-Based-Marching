@@ -250,6 +250,8 @@ bool Solver::addNextParentSlopePrimary(const double& distance, int x, int y, con
   if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
     std::cout << "  - pivot: " << pivot.first << ", " << ny_-1-pivot.second << std::endl;
     std::cout << "  - parent: " << parent.first << ", " << ny_-1-parent.second << std::endl;
+    std::cout << "  - primaryDist: " << primaryDist << std::endl;
+    std::cout << "  - secondaryDist: " << secondaryDist << std::endl;
     std::cout << "  - slope: " << slope << std::endl;
     if (onVisiblePoint) {
       std::cout << "  - This node was on the visible / pivot side" << std::endl;
@@ -340,14 +342,15 @@ bool Solver::addNextParentSlopePrimary(const double& distance, int x, int y, con
         if (closerToCurrent(x, y, pivot, cameFrom_(x, y))) {
           gScore_(x, y) = pivotDistance;
           cameFrom_(x, y) = pivot;
+          openSet_->push(Node{3, pivotDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, true});
           return true;
         }
         // if closer to other and other has same secondary direction
           forceMove(x, y, primaryDir, -1);
           pivotDistance = gScore_(pivot.first, pivot.second) + evaluateDistance(pivot.first, pivot.second, x, y);
-          if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
+          //if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
             std::cout << "-> the beginning of a switched search was set at: " << x << ", " << ny_-1-y << std::endl;
-          }
+          //}
           addNextSwitchedPrimary(pivotDistance, x, y, secondaryDir, primaryDir, secondaryDist, primaryDist-1, false, true);
           return false;
       }
