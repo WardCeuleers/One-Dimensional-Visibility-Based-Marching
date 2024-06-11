@@ -9,10 +9,11 @@ namespace vbd {
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-void Solver::createNewPivot(const point pivot, const point parent, const cardir primaryDir, const cardir secondaryDir, const float slope, bool inverseParent) {
+void Solver::createNewPivot(const point pivot, const point parent, const cardir primaryDir, const cardir secondaryDir, const float slope) {
 // 1) Add pivot to the pivot list
     pivots_[nb_of_pivots_] = pivot;
     ++nb_of_pivots_;
+    secondaryDir_(pivot) = secondaryDir;
 // 2) Add first primary straight point to the heap
 //--------------------------------------------------------------------------------
   int x = pivot.first;
@@ -48,19 +49,14 @@ void Solver::createNewPivot(const point pivot, const point parent, const cardir 
       if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
         std::cout << "    looking for first parent primary " << std::endl;
       }
-      if (inverseParent) {
-        addNextParentSlopePrimary(5, distance, x, y, primaryDir, secondaryDir, 1, 0, slope, false);
-      }
-      else {
-        addNextParentSlopePrimary(4, distance, x, y, primaryDir, secondaryDir, 1, 0, slope, false);
-      }
+      addNextParentSlopePrimary(distance, x, y, primaryDir, secondaryDir, 1, 0, slope, false);
     }
     else if (outOfBound) {
       return;
     }
     else {
       double distance = gScore_(parent) + evaluateDistance(parent.first, parent.second, x, y);
-      openSet_->push(Node{7, distance, x, y, primaryDir, secondaryDir, 1, 0, slope, false});
+      openSet_->push(Node{4, distance, x, y, primaryDir, secondaryDir, 1, 0, slope, false});
       if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
         std::cout << "-> added new occupied node at: " << x << ", " << ny_-1-y << std::endl;
       }
@@ -73,7 +69,7 @@ void Solver::createNewPivot(const point pivot, const point parent, const cardir 
       std::cout << "    looking for other first secondary at pivot with negative slope " << std::endl;
     }
     x = pivot.first; y = pivot.second;
-    Node node = {8, gScore_(pivot), x, y, primaryDir, oppDirection(secondaryDir), 0, 0, -slope, false};
+    Node node = {5, gScore_(pivot), x, y, primaryDir, oppDirection(secondaryDir), 0, 0, -slope, false};
     if (advancePivotSearch(node.distance, node.x, node.y, node.primaryDir, node.secondaryDir, node.primaryDist, node.secondaryDist, node.slope, node.state)) {
       openSet_->push(node);
     }
@@ -115,7 +111,7 @@ void Solver::addNextStraightPrimary(const double& distance, int x, int y, const 
   else {
     // create occupied node to search in secondary dir
     cameFrom_(x, y) = pivot;
-    openSet_->push(Node{7, distance+1, x, y, primaryDir, secondaryDir, primaryDist + 1, 0, 0, false});
+    openSet_->push(Node{4, distance+1, x, y, primaryDir, secondaryDir, primaryDist + 1, 0, 0, false});
     if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
       std::cout << "-> added new occupied node at: " << x << ", " << ny_-1-y << std::endl;
     }
@@ -145,6 +141,7 @@ void Solver::addNextPivotSlopePrimary(const double& distance, int x, int y, cons
   }
   if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
     std::cout << "  - pivot: " << pivot.first << ", " << ny_-1-pivot.second << std::endl;
+    std::cout << "  - slope: " << slope << std::endl;
     if (onVisiblePoint) {
       std::cout << "  - This node was on the visible side" << std::endl;
     }
@@ -155,17 +152,19 @@ void Solver::addNextPivotSlopePrimary(const double& distance, int x, int y, cons
   // ----- process the new point -----
   while (true) {
     double newDistance = gScore_(pivot.first, pivot.second) + evaluateDistance(pivot.first, pivot.second, x, y);
-  // if new point is occupied -> create occupied node search
+  // if new point is occupied + the point above is occupied-> create occupied node search
     if (sharedOccupancyField_->get(x, y)) {
-      cameFrom_(x, y) = pivot;
-      openSet_->push(Node{7, newDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, 0, false});
-      if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
-        std::cout << "-> added new occupied node at: " << x << ", " << ny_-1-y << std::endl;
+      if (!checkBackwards(x, y, primaryDir)) {
+        cameFrom_(x, y) = pivot;
+        openSet_->push(Node{4, newDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, 0, false});
+        if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
+          std::cout << "-> added new occupied node at: " << x << ", " << ny_-1-y << std::endl;
+        }
       }
       break;
     }
   // if the point is not visible
-    else if (primaryDist*slope > secondaryDist) {
+    else if (primaryDist*slope >= secondaryDist) {
       // if the non visible point came from a march on primary distance -> also march one in secondary
       if (onVisiblePoint) {
         if (move(x, y, secondaryDir)) {
@@ -181,7 +180,7 @@ void Solver::addNextPivotSlopePrimary(const double& distance, int x, int y, cons
       }
       // if the non visible point has no cameFrom or cameFrom the parent
       if (cameFrom_(x, y) == nullPoint_ || cameFrom_(cameFrom_(x, y)) == pivot) {
-        openSet_->push(Node{3, newDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, false});
+        openSet_->push(Node{2, newDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, false});
         if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
           std::cout << "-> added new non visible primary point at: " << x << ", " << ny_-1-y << std::endl;}
         break;
@@ -200,7 +199,7 @@ void Solver::addNextPivotSlopePrimary(const double& distance, int x, int y, cons
       gScore_(x, y) = newDistance;
       cameFrom_(x, y) = pivot;
       // add new node to the heap
-      openSet_->push(Node{3, newDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, true});
+      openSet_->push(Node{2, newDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, true});
       if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
         std::cout << "-> added new visible primary point at: " << x << ", " << ny_-1-y << std::endl;
       }
@@ -220,27 +219,40 @@ void Solver::addNextPivotSlopePrimary(const double& distance, int x, int y, cons
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-void Solver::addNextParentSlopePrimary(const u_int8_t& type, const double& distance, int x, int y, const cardir& primaryDir, const cardir& secondaryDir, int primaryDist, int secondaryDist, const float& slope, bool onVisiblePoint) {
+bool Solver::addNextParentSlopePrimary(const double& distance, int x, int y, const cardir& primaryDir, const cardir& secondaryDir, int primaryDist, int secondaryDist, const float& slope, bool onVisiblePoint) {
   point pivot = getPivot(x, y, primaryDir, secondaryDir, primaryDist, secondaryDist);
   point parent;
-  // ----- advance in correct direction -----
+  // if on a visible point
   if (onVisiblePoint) {
-    parent = cameFrom_(pivot);
-    if (move(x, y, primaryDir))
-      primaryDist += 1;
-    else
-      return;
+    // if the starting point changed ownership
+    if (cameFrom_(x, y) != nullPoint_ && cameFrom_(x, y) != pivot) {
+      //if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
+        std::cout << "-> the beginning of a switched search was set at: " << x << ", " << ny_-1-y << std::endl;
+      //}
+      addNextSwitchedPrimary(distance, x, y, secondaryDir, primaryDir, secondaryDist, primaryDist, false, true);
+      return false;
+    }
+    // else march
+    else {
+      parent = cameFrom_(pivot);
+      if (move(x, y, primaryDir))
+        primaryDist += 1;
+      else
+        return true;
+    }
   }
+  // if on a non visible point
   else {
     parent = cameFrom_(pivot);
     if (move(x, y, secondaryDir))
       secondaryDist += 1;
     else
-      return;
+      return true;
   }
   if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
     std::cout << "  - pivot: " << pivot.first << ", " << ny_-1-pivot.second << std::endl;
     std::cout << "  - parent: " << parent.first << ", " << ny_-1-parent.second << std::endl;
+    std::cout << "  - slope: " << slope << std::endl;
     if (onVisiblePoint) {
       std::cout << "  - This node was on the visible / pivot side" << std::endl;
     }
@@ -251,7 +263,7 @@ void Solver::addNextParentSlopePrimary(const u_int8_t& type, const double& dista
   // ----- process the new point -----
   while (true) {
   // if the new point is on the parent side
-    if (evaluateCardinalDistance(primaryDir, parent.first, parent.second, x, y)*slope 
+    if ( evaluateCardinalDistance(primaryDir, parent.first, parent.second, x, y)*slope 
                 >= evaluateCardinalDistance(secondaryDir, parent.first, parent.second, x, y))
     {
       double parentDistance = gScore_(parent.first, parent.second) + evaluateDistance(parent.first, parent.second, x, y);
@@ -261,11 +273,11 @@ void Solver::addNextParentSlopePrimary(const u_int8_t& type, const double& dista
           std::cout << "-> the new point was on the parent side and occupied" << std::endl;
         }
         cameFrom_(x, y) = pivot;
-        openSet_->push(Node{7, parentDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, 0, false});
+        openSet_->push(Node{4, parentDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, 0, false});
         if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
           std::cout << "-> added new occupied node at: " << x << ", " << ny_-1-y << std::endl;
         }
-        break;
+        return true;
       }
       // parent / non visible side and free
       else {
@@ -275,29 +287,27 @@ void Solver::addNextParentSlopePrimary(const u_int8_t& type, const double& dista
             secondaryDist += 1;
             onVisiblePoint = false;
             if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
-              std::cout << "-> the new point was on the parent side and free, thus the algorithm looked one cell further" << std::endl;
+              std::cout << "-> the new point was on the parent side and free, so the algorithm looked one cell further" << std::endl;
             }
             continue;
           }
           else
-            return;
+            return true;
         }
         // if the non visible point has no cameFrom or cameFrom the parent
         if (cameFrom_(x, y) == nullPoint_ || cameFrom_(x, y) == parent) {
-            openSet_->push(Node{type, parentDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, false});
+            openSet_->push(Node{3, parentDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, false});
           if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
             std::cout << "-> added new non visible primary point at: " << x << ", " << ny_-1-y << std::endl;
-            std::cout << "       primaryDist = " << primaryDist << std::endl;
-            std::cout << "       secondaryDist = " << secondaryDist << std::endl;
           }
-          break;
+          return true;
         }
         // if the non visible point came from a differen point
         else {
           if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
             std::cout << "-> the new point was on the non visible side, but hit the zone of a other pivot thus the march stopped here" << std::endl;
           }
-          return;
+          return true;
         }
       }
     }
@@ -307,11 +317,11 @@ void Solver::addNextParentSlopePrimary(const u_int8_t& type, const double& dista
       // pivot side and occupied
       if (sharedOccupancyField_->get(x, y)) {
         cameFrom_(x, y) = pivot;
-        openSet_->push(Node{7, pivotDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, 0, false});
+        openSet_->push(Node{4, pivotDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, 0, false});
         if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
           std::cout << "-> the new point was: on pivot side + occupied = new occupied node at: " << x << ", " << ny_-1-y << std::endl;
         }
-        break;
+        return true;
       }
       // pivot side and free cell that has no distance assigned yet
       else if (gScore_(x, y) == infinity) {
@@ -319,28 +329,36 @@ void Solver::addNextParentSlopePrimary(const u_int8_t& type, const double& dista
         gScore_(x, y) = pivotDistance;
         cameFrom_(x, y) = pivot;
         // add new node to the heap
-        openSet_->push(Node{type, pivotDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, true});
+        openSet_->push(Node{3, pivotDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, true});
         if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
-          std::cout << "-> the new point at (" << x << ", " << ny_-1-y << ") was: on pivot side + free =  new visible primary point at: " << x << ", " << ny_-1-y << std::endl;
+          std::cout << "-> the new point at (" << x << ", " << ny_-1-y << ") was: on pivot side + free = new visible primary point at: " << x << ", " << ny_-1-y << std::endl;
         }
-        break;
+        return true;
       }
       // pivot side and free cell that has a distance assigned
       else {
         if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
-          std::cout << "-> the new point (" << x << ", " << ny_-1-y << ") was on the pivot side but had already a distance assigned" << std::endl;
+          std::cout << "-> the new point (" << x << ", " << ny_-1-y << ") was on the pivot side but already had a distance assigned" << std::endl;
         }
         // if closer to the current position then to other
         if (closerToCurrent(x, y, pivot, cameFrom_(x, y))) {
           gScore_(x, y) = pivotDistance;
           cameFrom_(x, y) = pivot;
+          return true;
         }
-        // if closer to other and reference of parent is inverse
-        else if (type == 5) {
-          std::cout << "initiateSwitched Searched Should have happend here" << std::endl;
-          //initiateSwitchedSearch(pivot, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist);
+        // if closer to other and other has same secondary direction
+        else if (secondaryDir_(cameFrom_(x, y)) == secondaryDir) {
+          forceMove(x, y, primaryDir, -1);
+          pivotDistance = gScore_(pivot.first, pivot.second) + evaluateDistance(pivot.first, pivot.second, x, y);
+          if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
+            std::cout << "-> the beginning of a switched search was set at: " << x << ", " << ny_-1-y << std::endl;
+          }
+          addNextSwitchedPrimary(pivotDistance, x, y, secondaryDir, primaryDir, secondaryDist, primaryDist-1, false, true);
+          return false;
         }
-        break;
+        else {
+          return true;
+        }
       }
     }
   }
@@ -348,13 +366,17 @@ void Solver::addNextParentSlopePrimary(const u_int8_t& type, const double& dista
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-bool Solver::advanceSecondaryNode(uint8_t& type, double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist,  int& secondaryDist, bool& moveBoundary) {
+bool Solver::advanceSecondaryNode(double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist,  int& secondaryDist, bool& moveBoundary, bool checkCFstart) {
   bool outOfBound = false;
   point parent = getPivot(x, y, primaryDir, secondaryDir, primaryDist, secondaryDist);
   point block;
   if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
     std::cout << "  - parent: " << parent.first << ", " << ny_-1-parent.second << std::endl;
     std::cout << "  - moveBoundary: " << moveBoundary << std::endl;
+  }
+  // if start changed ownership
+  if (checkCFstart && cameFrom_(x, y) != nullPoint_ && cameFrom_(x, y) != parent) {
+    return false;
   }
   // read in boundary from starting point if moveboundary is true
   if (moveBoundary) {
@@ -397,7 +419,7 @@ bool Solver::advanceSecondaryNode(uint8_t& type, double& distance, int& x, int& 
             if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
               std::cout << "-> created a node to create a pivot at: " << x << ", " << ny_-1-y << std::endl;
             }
-            openSet_->push(Node{10, distance, x, y, secondaryDir, oppDirection(primaryDir), 0, 0, -1/blockSlope, false});
+            openSet_->push(Node{7, distance, x, y, secondaryDir, oppDirection(primaryDir), 0, 0, -1/blockSlope, false});
           }
         }
       }
@@ -410,7 +432,7 @@ bool Solver::advanceSecondaryNode(uint8_t& type, double& distance, int& x, int& 
             if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
               std::cout << "-> created a node to create a pivot at: " << x << ", " << ny_-1-y << std::endl;
             }
-            openSet_->push(Node{10, distance, x, y, primaryDir, secondaryDir, 0, 0, blockSlope, false});
+            openSet_->push(Node{7, distance, x, y, primaryDir, secondaryDir, 0, 0, blockSlope, false});
             forceMove(x, y, secondaryDir);
           }
         }
@@ -473,16 +495,12 @@ bool Solver::advanceSecondaryNode(uint8_t& type, double& distance, int& x, int& 
       }
     }
   // determine if you need to continue as an occupied node
-    // if on first primary of straight search mode
-    if (type == 2 && primaryDist == 1) {
+    // if on moveboundary or a boundary was discovered inside the object
+    if (moveBoundary || alreadyOnBoundary) {
       return false;
     }
-    // if already on boundary
-    else if (moveBoundary) {
-      return false;
-    }
-    // if the march in the object discovered a new boundary
-    else if (alreadyOnBoundary) {
+    // if on the first secondary of the edge search
+    else if (primaryDist == 1 && secondaryDir_(parent) != secondaryDir) {
       return false;
     }
     // if the prev point on primary is occupied
@@ -493,7 +511,7 @@ bool Solver::advanceSecondaryNode(uint8_t& type, double& distance, int& x, int& 
     else {
       cameFrom_(x, y) = parent;
       distance = gScore_(parent.first, parent.second) + evaluateDistance(parent.first, parent.second, x, y);
-      openSet_->push(Node{7, distance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist+1, 0, false});
+      openSet_->push(Node{4, distance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist+1, 0, false});
       if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
         std::cout << "-> updated the secondary to an occupied node at: " << x << ", " << ny_-1-y << std::endl;
       }
@@ -504,10 +522,18 @@ bool Solver::advanceSecondaryNode(uint8_t& type, double& distance, int& x, int& 
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-bool Solver::advanceOccupiedNode(double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist,  int& secondaryDist, float& slope) {
+bool Solver::advanceOccupiedNode(double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist,  int& secondaryDist) {
   point parent = cameFrom_(x, y);
+  if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
+    std::cout << "  - parent: " << parent.first << ", " << ny_-1-parent.second << std::endl;
+    std::cout << "  - primaryDir: " << cardir_to_string(primaryDir) << std::endl;
+    std::cout << "  - secondaryDir: " << cardir_to_string(secondaryDir) << std::endl;
+    std::cout << "  - primaryDist: " << primaryDist << std::endl;
+    std::cout << "  - secondaryDist: " << secondaryDist << std::endl;
+  }
   // remove camefrom from inside object
   cameFrom_(x, y) = nullPoint_;
+  // move to next point
   if (!move(x, y, secondaryDir)) {
     return false;
   }
@@ -528,7 +554,14 @@ bool Solver::advanceOccupiedNode(double& distance, int& x, int& y, const cardir&
         if (checkBackwards(x, y, primaryDir)) {
           return false;
         }
-        // if the prev point on primary is free -> continue occupied search
+        // if the occupied point is not next to a sibling -> stop
+        if (!nextToSibling(x, y, primaryDir, parent, true)) {
+          if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
+            std::cout << "-> the new point was occupied, but not next to a sibling" << std::endl;
+          }
+          return false;
+        }
+        // if the prev point on primary is free and still next to points assiged to its pivot -> continue occupied search
         else {
           cameFrom_(x, y) = parent;
           distance = gScore_(parent.first, parent.second) + evaluateDistance(parent.first, parent.second, x, y);
@@ -541,6 +574,9 @@ bool Solver::advanceOccupiedNode(double& distance, int& x, int& y, const cardir&
       }
       // if the point after the move is free, but there is an object blocking the path arround the corner
       else if (checkBackwards(x, y, primaryDir)) {
+        if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
+          std::cout << "-> the new point was free, but the path around the corner was blocked" << std::endl;
+        }
         return false;
       }
       // if the point after the move is free, and there is a path to it
@@ -556,15 +592,18 @@ bool Solver::advanceOccupiedNode(double& distance, int& x, int& y, const cardir&
               gScore_(x, y) = distance;
               cameFrom_(x, y) = parent;
             }
+            if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
+              std::cout << "-> the point behind the object was visible, but already had a distance assigned" << std::endl;
+            }
             return false;
           }
           // if there is no distance assigned continue
           gScore_(x, y) = distance;
           cameFrom_(x, y) = parent;
           // add new primary point of parent at the current location
-          openSet_->push(Node{3, distance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, blockSlope, true});
+          openSet_->push(Node{2, distance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, blockSlope, true});
           // add node to start looking for the pivot location
-          openSet_->push(Node{8, distance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, blockSlope, true});
+          openSet_->push(Node{5, distance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, blockSlope, true});
           if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
             std::cout << "-> added new visible primary point at: " << x << ", " << ny_-1-y << std::endl;
             std::cout << "-> added new pivot search at the back at : " << x << ", " << ny_-1-y << std::endl;
@@ -578,10 +617,10 @@ bool Solver::advanceOccupiedNode(double& distance, int& x, int& y, const cardir&
           if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
             std::cout << "-> created a node to create a pivot at: " << x << ", " << ny_-1-y << std::endl;
           }
-          openSet_->push(Node{10, distance, x, y, secondaryDir, primaryDir, 0, 0, 1/blockSlope, true});
+          openSet_->push(Node{7, distance, x, y, secondaryDir, primaryDir, 0, 0, 1/blockSlope, true});
           forceMove(x, y, primaryDir);
           // add the node to start looking for the new primary point to the parent
-          openSet_->push(Node{3, distance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, blockSlope, false});
+          openSet_->push(Node{2, distance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, blockSlope, false});
           if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
             std::cout << "-> added new non visible primary point at: " << x << ", " << ny_-1-y << std::endl;
           }
@@ -601,8 +640,8 @@ bool Solver::advancePivotSearch(double& distance, int& x, int& y, const cardir& 
   // if node is not next to object expand secondary search
   if (!nextToObject) {
     cameFrom_(x, y) = pivot;
-    Node node = {2, distance, x, y, primaryDir, oppDirection(secondaryDir), primaryDist, 0, 0, false};
-    if (advanceSecondaryNode(node.type ,node.distance, node.x, node.y, node.primaryDir, node.secondaryDir, node.primaryDist, node.secondaryDist, node.state)) {
+    Node node = {0, distance, x, y, primaryDir, oppDirection(secondaryDir), primaryDist, 0, 0, false};
+    if (advanceSecondaryNode(node.distance, node.x, node.y, node.primaryDir, node.secondaryDir, node.primaryDist, node.secondaryDist, node.state)) {
       openSet_->push(node);
     }
     cameFrom_(x, y) = parent;
@@ -625,7 +664,7 @@ bool Solver::advancePivotSearch(double& distance, int& x, int& y, const cardir& 
     if (sharedOccupancyField_->get(x, y)) {
       if (!nextToObject) {
         cameFrom_(x, y) = pivot;
-        openSet_->push(Node{7, distance, x, y, primaryDir, oppDirection(secondaryDir), primaryDist, 0, 0, false});
+        openSet_->push(Node{4, distance, x, y, primaryDir, oppDirection(secondaryDir), primaryDist, 0, 0, false});
         if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
           std::cout << "-> added new occupied node at: " << x << ", " << ny_-1-y << std::endl;
         }
@@ -646,7 +685,7 @@ bool Solver::advancePivotSearch(double& distance, int& x, int& y, const cardir& 
         if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
           std::cout << "-> created a node to create a pivot at: " << x << ", " << ny_-1-y << std::endl;
         }
-        openSet_->push(Node{10, distance, x, y, primaryDir, oppDirection(secondaryDir), 0, 0, -slope, false});
+        openSet_->push(Node{7, distance, x, y, primaryDir, oppDirection(secondaryDir), 0, 0, -slope, false});
         return false;
       }
     }
@@ -685,7 +724,7 @@ bool Solver::advancePivotSearch(double& distance, int& x, int& y, const cardir& 
     if (sharedOccupancyField_->get(x, y)) {
       if (!nextToObject) {
         cameFrom_(x, y) = pivot;
-        openSet_->push(Node{7, distance, x, y, primaryDir, oppDirection(secondaryDir), primaryDist+1, 0, 0, false});
+        openSet_->push(Node{4, distance, x, y, primaryDir, oppDirection(secondaryDir), primaryDist+1, 0, 0, false});
         if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
           std::cout << "-> added new occupied node at: " << x << ", " << ny_-1-y << std::endl;
         }
@@ -698,7 +737,7 @@ bool Solver::advancePivotSearch(double& distance, int& x, int& y, const cardir& 
       if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
         std::cout << "-> creating pivot at: " << x << ", " << ny_-1-y << std::endl;
       }
-      createNewPivot({x, y}, pivot, secondaryDir, primaryDir, 1/slope, true);
+      createNewPivot({x, y}, pivot, secondaryDir, primaryDir, 1/slope);
       return false;
     }
     // previous point and next point are free and next to void
@@ -712,7 +751,7 @@ bool Solver::advancePivotSearch(double& distance, int& x, int& y, const cardir& 
       // add next straight primary point to the heap
       openSet_->push(Node{1, distance, x, y, primaryDir, oppDirection(secondaryDir), primaryDist+1, 0, 0, false});
       // start looking for the next parent primary point
-      openSet_->push(Node{4, distance, x, y, secondaryDir, primaryDir, 0, primaryDist+1, 1/slope, true});
+      openSet_->push(Node{3, distance, x, y, secondaryDir, primaryDir, 0, primaryDist+1, 1/slope, true});
       return false;
     }
   }
@@ -720,68 +759,49 @@ bool Solver::advancePivotSearch(double& distance, int& x, int& y, const cardir& 
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-void Solver::initiateSwitchedSearch(const point& pivot, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist) {
-  bool outOfBound = false;
-  forceMove(x, y, primaryDir, -1);
-  if (advance(x, y, secondaryDir, outOfBound)) {
-    double newDistance = gScore_(pivot.first, pivot.second) + evaluateDistance(pivot.first, pivot.second, x, y);
-    openSet_->push(Node{9, newDistance, x, y, secondaryDir, primaryDir, secondaryDist+1, primaryDist-1, 0, true}); 
-    //    (primary dist is not adapted as it assumes it was not updated in previous function)
+bool Solver::addNextSwitchedPrimary(const double& distance, int x, int y, const cardir& primaryDir, const cardir& secondaryDir, int primaryDist, const int& secondaryDist, bool moveBoundary, bool initialCall) {
+  point pivot = getPivot(x, y, primaryDir, secondaryDir, primaryDist, secondaryDist);
+  // add the next primary point
+  double newDistance = distance; 
+  if (advanceSecondaryNode(newDistance, x, y, secondaryDir, primaryDir, secondaryDist, primaryDist, moveBoundary, !initialCall)) {
+    openSet_->push(Node{6, newDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, 0, moveBoundary});
+    return true;
+  }
+  if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
+    std::cout << "-> primary switched march faled at: " << x << ", " << ny_-1-y << std::endl;
+  } 
+  // if the march failed because it went out of bounds
+  if (x < 0 || x >= nx_ || y < 0 || y >= ny_) {
+    return true;
+  }
+  // if the march ended on a occupied cell
+  if (sharedOccupancyField_->get(x, y)) {
     if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
-      std::cout << "-> started new switched search at: " << x << ", " << ny_-1-y << std::endl;
+      std::cout << "-> the new point was occupied" << std::endl;
     }
+    cameFrom_(x, y) = pivot;
+    openSet_->push(Node{4, newDistance, x, y, primaryDir, secondaryDir, primaryDist+1, secondaryDist, 0, false});
+    return true;
   }
-  else if (!outOfBound) {
-    point object = {x, y};
-    if (advance(x, y, primaryDir)) {
-      blockCorners_(x, y) = object;
-    }
-  }
-}
-/*****************************************************************************/
-/*****************************************************************************/
-/*****************************************************************************/
-bool Solver::addNextSwitchedPrimary(const double& distance, int x, int y, const cardir& primaryDir, const cardir& secondaryDir, int primaryDist, const int& secondaryDist, bool firstPoint) {
-  point pivot = getPivot(x, y, primaryDir, secondaryDir, primaryDist, 0);
-  // if the primary point is still on a point that camefrom the pivot
-  if (cameFrom_(x, y) == pivot) {
-    bool outOfBound = false;
-    if (advance(x, y, primaryDir, outOfBound)) {
-      primaryDist += 1;
-      double newDistance = gScore_(pivot.first, pivot.second) + evaluateDistance(pivot.first, pivot.second, x, y);
-      if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
-        std::cout << "-> added switched search at: " << x << ", " << ny_-1-y << std::endl;
-      }
-      openSet_->push(Node{9, newDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, 0, false});
+  // if the march ended on a free cell
+  else {
+    // if the primary march ended overwrithing a camefrom to the pivot
+    if (cameFrom_(x, y) == pivot && distanceToEdge(primaryDir, x, y) != 0) {
+      openSet_->push(Node{6, newDistance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, 0, moveBoundary});
       return true;
     }
-    // if the advance failed because out of bounds
-    else if (outOfBound){
-      return false;
-    }
-    // if advance failed because of an object 
-    else {
-      // if the next point on secondary is occupied (if free than occupied is handeled by secondary of search before switch)
-      if (checkForwards(x, y, secondaryDir)) {
-        cameFrom_(x, y) = pivot;
-        double newDistance = gScore_(pivot.first, pivot.second) + evaluateDistance(pivot.first, pivot.second, x, y);
-        openSet_->push(Node{7, newDistance, x, y, primaryDir, secondaryDir, primaryDist + 1, secondaryDist, 0, false});
-        if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
-          std::cout << "-> added new occupied node at: " << x << ", " << ny_-1-y << std::endl;
-        }
+    // if the primaymarch failed because of a different pivot zone check and it was not the first call of swithed primary
+    else if (cameFrom_(x, y) != nullPoint_ && !initialCall) {
+      if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
+        std::cout << "-> switched search switch directions again at: " << x << ", " << ny_-1-y << std::endl;
       }
+      forceMove(x, y, primaryDir, -1);
+      addNextSwitchedPrimary(distance, x, y, secondaryDir, primaryDir, secondaryDist, primaryDist-1, false, true);
       return false;
     }
+    else
+      return true;
   }
-  // if the primary point is not on a point that camefrom the pivot
-  else if (!firstPoint){
-    // add another switched search, unless on first point of the secondary search
-    if (!firstPoint) {
-      primaryDist += 1;
-      initiateSwitchedSearch(pivot, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist);
-    }
-  }
-  return false; 
 }
 /*****************************************************************************/
 /*****************************************************************************/

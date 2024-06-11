@@ -135,9 +135,6 @@ int main() {
   if (!config.marchControl) {
     sol.visibilityBasedSolver();
   }
-  else if (config.mode == 1 && config.randomSeed == 1) {
-    std::cout << " March control is not possible, when generating random seeds, change to fixed seed or turn off march control\n";
-  }
   else {
     int ch;
     bool running = true;

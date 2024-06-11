@@ -299,11 +299,13 @@ bool const Solver::reverse(int& x, int& y, const cardir& dir) {
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-bool const Solver::check(const int& x, const int& y) {
-  if (x >= nx_ || x < 0 || y >= ny_ || y < 0) {return true;}
+bool const Solver::validCell(const int& x, const int& y) {
+  if (x >= nx_ || x < 0 || y >= ny_ || y < 0) {return false;}
   // return true if cell is occupied and false if free
-  return (sharedOccupancyField_->get(x,y));
+  return (!sharedOccupancyField_->get(x,y));
 }
+/*****************************************************************************/
+/*****************************************************************************/
 /*****************************************************************************/
 bool const Solver::checkForwards(const int& x, const int& y, const cardir& dir, int steps) {
   nb_of_marches_++;
@@ -465,6 +467,33 @@ bool const Solver::checkBackwards(const int& x, const int& y, const cardir& dir_
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
+bool const Solver::nextToSibling(const int& x, const int& y, const cardir& dir, const point& parent, bool reverse) {
+  if (reverse) {
+    switch (dir) {
+      case cardir::North: return (cameFrom_(x,y+1) == parent);
+      case cardir::East:  return (cameFrom_(x-1,y) == parent);
+      case cardir::South: return (cameFrom_(x,y-1) == parent);
+      case cardir::West:  return (cameFrom_(x+1,y) == parent);
+      default: 
+        std::cout << "Error: invalid direction in nextToSibling" << std::endl;
+        return false;
+    }
+  }
+  else {
+    switch (dir) {
+      case cardir::North: return (cameFrom_(x,y-1) == parent);
+      case cardir::East:  return (cameFrom_(x+1,y) == parent);
+      case cardir::South: return (cameFrom_(x,y+1) == parent);
+      case cardir::West:  return (cameFrom_(x-1,y) == parent);
+      default: 
+        std::cout << "Error: invalid direction in nextToSibling" << std::endl;
+        return false;
+    }
+  }
+}
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
 Solver::point Solver::getNeighbour(const int& x, const int& y, const cardir& dir, bool reverse) {
   if (reverse) {
     switch (dir) {
@@ -488,7 +517,6 @@ Solver::point Solver::getNeighbour(const int& x, const int& y, const cardir& dir
         return {x, y};
     }
   }
-
 }
 /*****************************************************************************/
 /*****************************************************************************/

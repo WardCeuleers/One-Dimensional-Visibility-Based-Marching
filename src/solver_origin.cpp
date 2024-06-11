@@ -148,7 +148,7 @@ void Solver::processSteepSlope(searchdir dir, int& x, int& y, const int visibili
         std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): gap pivot\n";
       }
       // create pivot with direction ortogonal to current
-      openSet_->push(Node{10, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, 0, false});
+      openSet_->push(Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, 0, false});
       foundGap = false; 
     }
     forceMove(x, y, dir.second, -1);
@@ -169,7 +169,7 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
       std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): small visibility diff\n";
     }
     // create pivot with same direction
-    openSet_->push(Node{10, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, slope, false});
+    openSet_->push(Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, slope, false});
     return;
   }
   //if large visibilityDiff, add only lowest possible pivot
@@ -180,7 +180,7 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
       std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): object next to start\n";
     }
     // create pivot with same direction
-    pivot = Node{8, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, slope, false};
+    pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, slope, false};
   }
   // else marchover location is beyond the object -> march back to the object
   else {
@@ -192,7 +192,7 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
       std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): object after marchdown\n";
     }
     // create pivot with direction ortogonal to current
-    pivot = Node{8, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -1/slope, false};
+    pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -1/slope, false};
   }
   // if the march is not at the previous visibility -> their could be a gap 
   for (march_dist; march_dist < visibilityDiff-1; march_dist++) {
@@ -205,7 +205,7 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
         std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): gap pivot\n";
       }
       // create pivot with direction ortogonal to current
-      pivot = Node{8, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -1/slope, false};
+      pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -1/slope, false};
       foundGap = false; 
     }
     forceMove(x, y, dir.second, -1);
@@ -372,7 +372,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
         std::cout << "  -> created a pivot at (" << x_pivot << ", " << ny_-1-y_pivot << "): march up primary\n";
       }
       // create pivot in inverse search direction
-      openSet_->push(Node{10, evaluateDistance(x_, y_, x_pivot, y_pivot), x_pivot, y_pivot, dir.second, dir.first, 0, 0, 1/startSlope, false});
+      openSet_->push(Node{7, evaluateDistance(x_, y_, x_pivot, y_pivot), x_pivot, y_pivot, dir.second, dir.first, 0, 0, 1/startSlope, false});
     }
     // march beyond
     else if (marchBeyond) {
@@ -380,7 +380,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
         std::cout << "  -> created a pivot at (" << x_pivot << ", " << ny_-1-y_pivot << "): march up primary and beyond\n";
       }
       // create pivot with inverse secondary direction
-      openSet_->push(Node{10, evaluateDistance(x_, y_, x_pivot, y_pivot), x_pivot, y_pivot, dir.first, oppDirection(dir.second), 0, 0, -startSlope, false});
+      openSet_->push(Node{7, evaluateDistance(x_, y_, x_pivot, y_pivot), x_pivot, y_pivot, dir.first, oppDirection(dir.second), 0, 0, -startSlope, false});
     }
   }
   // if the point behind the object is not visible
@@ -391,7 +391,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
         std::cout << "  -> created a pivot at (" << x_pivot << ", " << ny_-1-y_pivot << "): march one step back on primary\n";
       }
       // create pivot in inverse search direction
-      openSet_->push(Node{10, evaluateDistance(x_, y_, x_pivot, y_pivot), x_pivot, y_pivot, dir.second, dir.first, 0, 0, 1/startSlope, false});
+      openSet_->push(Node{7, evaluateDistance(x_, y_, x_pivot, y_pivot), x_pivot, y_pivot, dir.second, dir.first, 0, 0, 1/startSlope, false});
     }
   }
 // ****************** First secondary march ********************************************************

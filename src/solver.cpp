@@ -57,10 +57,11 @@ void Solver::reset() {
   y_ = ny_ - 1 - sharedConfig_->pos_y;
   startPoint_ = point(x_, y_);
   nullPoint_ = point(nx_+1, ny_+1);
-  focusPoint_ = nullPoint_;
+  endPoint_ = nullPoint_;
   // reset the fields
   gScore_.reset(nx_, ny_, infinity);
   cameFrom_.reset(nx_, ny_, nullPoint_);
+  secondaryDir_.reset(nx_, ny_, cardir::None);
   blockCorners_.reset(nx_, ny_, nullPoint_);
 
   openSet_.reset();
@@ -117,103 +118,101 @@ void Solver::visibilityBasedSolver() {
     }
     if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
       switch (curNode.type) {
+        case 0:
+          std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on secondary march\n";
+          break;
         case 1:
           std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on straight primary\n";
           break;
         case 2:
-          std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on straight secondary\n";
-          break;
-        case 3:
           std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on primary pivot slope\n";
           break;
+        case 3:
+          std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on primary parent slope\n";
+          break;
         case 4:
-          std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on primary normal parent slope\n";
-          break;
-        case 5:
-          std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on primary inverse parent slope\n";
-          break;
-        case 6:
-          std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on secondary of slope / switched\n";
-          break;
-        case 7:
           std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on occupied point\n";
           break;
-        case 8:
+        case 5:
           std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on pivot correction\n";
           break;
-        case 9:
+        case 6:
           std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on switched search\n";
           break;
-        case 10:
+        case 7:
           std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on pivot creation\n";
           break;
         default:
           break;
       }
-      focusPoint_ = point(curNode.x, curNode.y);
+      endPoint_ = point(curNode.x, curNode.y);
     }
 
-    // straight search mode
-    if (curNode.type <= 2) {
-      //add the next primary point
-      if (curNode.type == 1) {
-        addNextStraightPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist);
-        curNode.type = 2;
-      }
-      if (advanceSecondaryNode(curNode.type ,curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
+    // secondary search
+    if (curNode.type == 0) {
+      if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
         openSet_->push(curNode);
       }
     }
-    // slope search mode
-    else if (curNode.type <= 5) {
-      //add the next primary point
-      if (curNode.type == 3) {
-        addNextPivotSlopePrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state);
-        curNode.type = 6;
-      }
-      else { //  if (curNode.type == 4 or 5)
-        addNextParentSlopePrimary(curNode.type ,curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state);
-        curNode.type = 6;
-      }
-      // add the secondary march from this primary point if on visible point
-      if (curNode.state) {
-        curNode.state = false;
-        if (advanceSecondaryNode(curNode.type ,curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
+    // primary searches
+    else if (curNode.type <= 3) { 
+      // straight primary
+      if (curNode.type == 1) {
+        addNextStraightPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist);
+        curNode.type = 0;
+        if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
           openSet_->push(curNode);
         }
       }
-    }
-    // slope search mode on secondary
-    else if (curNode.type == 6) {
-      // add the next secondary march
-      if (advanceSecondaryNode(curNode.type ,curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
-        openSet_->push(curNode);
+      // pivot slope primary
+      else if (curNode.type == 2) {
+        addNextPivotSlopePrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state);
+        curNode.type = 0;
+        if (curNode.state) {
+          curNode.state = false;
+          if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
+            openSet_->push(curNode);
+          }
+        }
+      }
+      // parent slope primary
+      else {
+        if (addNextParentSlopePrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
+          curNode.type = 0;
+          if (curNode.state) {
+            curNode.state = false;
+            if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
+              openSet_->push(curNode);
+            }
+          }
+        }
       }
     }
     // occupied scan
-    else if (curNode.type == 7) {
-      if (advanceOccupiedNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope)) {
+    else if (curNode.type == 4) {
+      if (advanceOccupiedNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist)) {
         openSet_->push(curNode);
       }
     }
     // pivot correction
-    else if (curNode.type == 8) {
+    else if (curNode.type == 5) {
       if(advancePivotSearch(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
         openSet_->push(curNode);
       }
     }
     // switched pivot 
-    else if (curNode.type == 9) {
-      if (addNextSwitchedPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
-        curNode.type = 6;
-        if (advanceSecondaryNode(curNode.type ,curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
+    else if (curNode.type == 6) {
+      if (addNextSwitchedPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state, false)) {
+        curNode.type = 0;
+        curNode.state = false;
+        if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
           openSet_->push(curNode);
         }
       }
     }
     // pivot creation
-    else if (curNode.type == 10) {
-      createNewPivot({curNode.x, curNode.y}, cameFrom_(curNode.x, curNode.y), curNode.primaryDir, curNode.secondaryDir, curNode.slope, curNode.state);
+    else if (curNode.type == 7) {
+      createNewPivot({curNode.x, curNode.y}, cameFrom_(curNode.x, curNode.y), curNode.primaryDir, curNode.secondaryDir, curNode.slope);
     }
     // invalid type
     else {
@@ -415,8 +414,8 @@ void Solver::saveVisibilityBasedSolverImage(const Field<double> &gScore) const {
     }
   }
 // color the focusPoint
-  if (focusPoint_ != nullPoint_) {
-    image.setPixel(focusPoint_.first, focusPoint_.second, sf::Color::White);
+  if (endPoint_ != nullPoint_) {
+    image.setPixel(endPoint_.first, endPoint_.second, sf::Color::White);
   }
 // Save the image
   if (!sharedConfig_->silent) {
