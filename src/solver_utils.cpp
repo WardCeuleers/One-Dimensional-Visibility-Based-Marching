@@ -41,6 +41,21 @@ int const Solver::evaluateCardinalDistance(const cardir& dir, const int& x1, con
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
+int const Solver::evaluateAbsoluteCardinalDistance(const cardir& dir, const int& x1, const int& y1, const int& x2, const int& y2) {
+  switch (dir) {
+    case cardir::North:
+    case cardir::South: 
+      return std::abs(y1-y2);
+    case cardir::East:
+    case cardir::West:  
+      return std::abs(x1-x2);
+    default: 
+      return std::numeric_limits<int>::max();
+  }
+}
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
 double const Solver::getDistance(int x, int y, cardir dir_1, bool reverse) {
   // march
   if (reverse) {
@@ -95,6 +110,28 @@ int const Solver::distanceToEdge(const cardir& dir, const int& x, const int& y) 
     default: 
       std::cout << "Error: invalid direction in distanceToEdge" << std::endl;
       return 0;
+  }
+}
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
+bool const Solver::onParentSide(const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist, const float& slope, bool innerSide) {
+  switch(secondaryDir) {
+    case cardir::North:
+    case cardir::South:
+      if (innerSide)
+        return primaryDist >= secondaryDist*slope;
+      else 
+        return primaryDist <= secondaryDist*slope;
+    case cardir::East:
+    case cardir::West:
+      if (innerSide) 
+        return primaryDist*slope >= secondaryDist;
+      else
+        return primaryDist*slope <= secondaryDist;
+    default:
+      std::cout << "Error: invalid direction for onVisibleSide" << std::endl;
+      return false;
   }
 }
 /*****************************************************************************/
@@ -563,6 +600,22 @@ Solver::point Solver::getPivot(const int& x, const int& y, const cardir& primary
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
+float const Solver::calcSlope(const cardir& secondaryDir, const float& primaryDist, const float& secondaryDist) {
+  switch(secondaryDir) {
+    case cardir::North:
+    case cardir::South:
+      return primaryDist/secondaryDist;
+    case cardir::East:
+    case cardir::West:
+      return secondaryDist/primaryDist;
+    default:
+      std::cout << "Error: invalid direction in calcSlope" << std::endl;
+      return infinity;
+  }
+}
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
 float const Solver::calcBlockSlope(const cardir& primaryDir, const cardir& secondaryDir, const point& parent, const point& block) {
   switch (primaryDir) {
     case cardir::North:
@@ -589,10 +642,10 @@ float const Solver::calcBlockSlope(const cardir& primaryDir, const cardir& secon
       }
     case cardir::East:
       if (secondaryDir==cardir::North) {
-        return (parent.second-block.second-0.5)/(block.first-parent.first+0.5);
+        return (block.first-parent.first+0.5)/(parent.second-block.second-0.5);
       }
       else if (secondaryDir==cardir::South) {
-        return (block.second-parent.second-0.5)/(block.first-parent.first+0.5);
+        return (block.first-parent.first+0.5)/(block.second-parent.second-0.5);
       }
       else {
         std::cout << "Error: invalid direction in calcBlockSlope" << std::endl;
@@ -600,10 +653,10 @@ float const Solver::calcBlockSlope(const cardir& primaryDir, const cardir& secon
       }
     case cardir::West: 
       if (secondaryDir==cardir::North) {
-        return (parent.second-block.second-0.5)/(parent.first-block.first+0.5);
+        return (parent.first-block.first+0.5)/(parent.second-block.second-0.5);
       }
       else if (secondaryDir==cardir::South) {
-        return (block.second-parent.second-0.5)/(parent.first-block.first+0.5);
+        return (parent.first-block.first+0.5)/(block.second-parent.second-0.5);
       }
       else {
         std::cout << "Error: invalid direction in calcBlockSlope" << std::endl;
@@ -612,6 +665,22 @@ float const Solver::calcBlockSlope(const cardir& primaryDir, const cardir& secon
     default: 
       std::cout << "Error: invalid direction in calcBlockSlope" << std::endl;
       return infinity;
+  }
+}
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
+bool const Solver::smallerSlope(const cardir& primaryDir, const float& oldSlope, const float& newSlope) {
+  switch(primaryDir) {
+    case cardir::North:
+    case cardir::South:
+      return (newSlope < oldSlope);
+    case cardir::East:
+    case cardir::West:
+      return (newSlope > oldSlope);
+    default:
+      std::cout << "Error: invalid direction in smallerSlope" << std::endl;
+      return false;
   }
 }
 /*****************************************************************************/

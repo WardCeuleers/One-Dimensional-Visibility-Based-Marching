@@ -76,15 +76,15 @@ int Solver::traverseVoid(int& x, int& y, cardir dir, const double maxMarchDist) 
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-void Solver::march_to_slope(cardir dir, int& x, int& y, point parent, const int& primaryDist, const int& secondaryDist, const float& slope, int& visibilityDist, bool& marchBool, bool& outOfBound) {
+void Solver::march_to_slope(cardir dir, int& x, int& y, const int& primaryDist, const int& secondaryDist, const float& slope, int& visibilityDist, bool& marchBool, bool& outOfBound) {
   visibilityDist = 0;
   marchBool = false;
   outOfBound = false;
   while (advance(x, y, dir, outOfBound)) {
     visibilityDist++;
-    if (visibilityDist + secondaryDist <= primaryDist*slope) {
-      gScore_(x, y) = evaluateDistance(x, y, parent.first, parent.second);
-      cameFrom_(x, y) = parent;
+    if (onParentSide(dir, primaryDist, visibilityDist + secondaryDist, slope)) {
+      gScore_(x, y) = evaluateDistance(x, y, x_, y_);
+      cameFrom_(x, y) = startPoint_;
     } 
     else {
       marchBool = true;
@@ -101,24 +101,16 @@ int Solver::advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primary
   if(!move(x, y, dir.first))
     return 3;
   primaryDist++;
-  // secondary dist where clipping could happen
-  int secondaryClippingDist = round((primaryDist-0.5)*primarySlope);
   bool clipping = false;
+  float clippingSlope;
   // march in secondary direction untill you are past the slope or out of bounds
-  while (primaryDist*primarySlope > secondaryDist) {
+  while (!onParentSide(dir.second, primaryDist, secondaryDist, primarySlope, false)) {
     if(!move(x, y, dir.second))
       return 3;
     secondaryDist++;
     // check for valid path to the current point
     if (getDistance(x, y, dir.first, true) == infinity) 
       return 3;
-    // check for clipping
-    if (secondaryDist >= secondaryClippingDist) {
-      if (checkBackwards(x, y, dir.first)) {
-        primarySlope = (secondaryDist + 0.5)/(primaryDist - 0.5);
-        clipping = true;
-      }
-    } 
   }
   // check for object at end of march
   if (!sharedOccupancyField_->get(x, y)) {
@@ -192,7 +184,7 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
       std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): object after marchdown\n";
     }
     // create pivot with direction ortogonal to current
-    pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -1/slope, false};
+    pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -slope, false};
   }
   // if the march is not at the previous visibility -> their could be a gap 
   for (march_dist; march_dist < visibilityDiff-1; march_dist++) {
@@ -205,7 +197,7 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
         std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): gap pivot\n";
       }
       // create pivot with direction ortogonal to current
-      pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -1/slope, false};
+      pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -slope, false};
       foundGap = false; 
     }
     forceMove(x, y, dir.second, -1);
@@ -226,7 +218,11 @@ void Solver::processJump(searchdir dir, int& x, int& y, const int primaryDist, c
     std::cout << "       stopSlope   = " << stopSlope << "\n";
   }
 // calculate the lengt of visible jumpline = maxMarchDist
-  double maxMarchDist = primaryDist*stopSlope - secondaryDist;
+  double maxMarchDist;
+  if (dir.second == cardir::North || dir.second == cardir::South)
+    maxMarchDist = primaryDist/stopSlope - secondaryDist;
+  else
+    maxMarchDist = primaryDist*stopSlope - secondaryDist;
   int dist_to_edge = distanceToEdge(dir.second, x, y);
   if (maxMarchDist > dist_to_edge)
     maxMarchDist = dist_to_edge;
@@ -282,7 +278,7 @@ void Solver::ComputeDistanceFromCarindal(searchdir dir, const int basePrimaryVis
   }
   int x_pri = x_;
   int y_pri = y_;
-  float blockSlope = (baseSecondaryVisibility + 0.5) / 0.5;
+  float blockSlope = calcSlope(dir.second, 0.5, baseSecondaryVisibility + 0.5);
   int prevVisibilityDist = baseSecondaryVisibility;
   bool marchOver;
   bool outOfBound;
@@ -294,7 +290,7 @@ void Solver::ComputeDistanceFromCarindal(searchdir dir, const int basePrimaryVis
     // march over secondary direction
     int x_sec = x_pri;
     int y_sec = y_pri;
-    march_to_slope(dir.second, x_sec, y_sec, startPoint_, primaryDist, 0, blockSlope, visibilityDist, marchOver, outOfBound);
+    march_to_slope(dir.second, x_sec, y_sec, primaryDist, 0, blockSlope, visibilityDist, marchOver, outOfBound);
 // Process result of the march over secondary direction
   // ------- marchOver: new line of sight --------
     if (marchOver && !marchOverSame) {
@@ -316,7 +312,7 @@ void Solver::ComputeDistanceFromCarindal(searchdir dir, const int basePrimaryVis
         processJump(dir, x_sec, y_sec, primaryDist, visibilityDist+1, blockSlope, visibilityDist, prevVisibilityDist);
       }
         //update blockslope
-        blockSlope = (visibilityDist + 0.5) / (primaryDist + 0.5); 
+        blockSlope = calcSlope(dir.second, primaryDist + 0.5, visibilityDist + 0.5);
         marchOverSame = false;
     }
     prevVisibilityDist = visibilityDist;
@@ -332,18 +328,20 @@ void Solver::ComputeDistanceFromCarindal(searchdir dir, const int basePrimaryVis
 void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_start, int primaryDist, int secondaryDist, int prevVisibilityDist, int gapWidth, float blockSlope) {
   if (sharedConfig_->debugCardinalSearch) {
     std::cout << "-----Computing sloped visibility at (" << x_start << ", " << ny_-1-y_start << ")-----\n";
+    std::cout << "         direction   = (" << cardir_to_string(dir.first) << ", " << cardir_to_string(dir.second) << ")\n";
     std::cout << "        primaryDist  = " << primaryDist << "\n";
     std::cout << "       secondaryDist = " << secondaryDist << "\n";
     std::cout << "       prevVisibDist = " << prevVisibilityDist << "\n";
     std::cout << "         gapWidth    = " << gapWidth << "\n";
     std::cout << "        blockSlope   = " << blockSlope << "\n";
+    std::cout << "        startSlope   = " << calcSlope(dir.second, primaryDist - 0.5, secondaryDist - 0.5) << "\n";
   }
 // ****************** creating new pivot ********************************************************
   int x_pivot = x_start;
   int y_pivot = y_start;
-  float startSlope = (secondaryDist - 0.5)/(primaryDist -0.5);
+  float startSlope = calcSlope(dir.second, primaryDist - 0.5, secondaryDist - 0.5);
   // if the point behind the object is visible
-  if (secondaryDist >= primaryDist*startSlope) {
+  if (onParentSide(dir.second, primaryDist, secondaryDist, startSlope, false)) {
     int pivotPrimaryDist = primaryDist;
     bool createPivot = false;
     bool marchBeyond = false;
@@ -351,7 +349,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
     while(true) {
       if (advance(x_pivot, y_pivot, dir.first)) {
         pivotPrimaryDist++;
-        if (secondaryDist >= pivotPrimaryDist*startSlope) {
+        if (onParentSide(dir.second, pivotPrimaryDist, secondaryDist, startSlope, false)) {
           if (!checkBackwards(x_pivot, y_pivot, dir.second)) {
             marchBeyond = true;
             break;
@@ -372,7 +370,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
         std::cout << "  -> created a pivot at (" << x_pivot << ", " << ny_-1-y_pivot << "): march up primary\n";
       }
       // create pivot in inverse search direction
-      openSet_->push(Node{7, evaluateDistance(x_, y_, x_pivot, y_pivot), x_pivot, y_pivot, dir.second, dir.first, 0, 0, 1/startSlope, false});
+      openSet_->push(Node{7, evaluateDistance(x_, y_, x_pivot, y_pivot), x_pivot, y_pivot, dir.second, dir.first, 0, 0, startSlope, false});
     }
     // march beyond
     else if (marchBeyond) {
@@ -391,14 +389,14 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
         std::cout << "  -> created a pivot at (" << x_pivot << ", " << ny_-1-y_pivot << "): march one step back on primary\n";
       }
       // create pivot in inverse search direction
-      openSet_->push(Node{7, evaluateDistance(x_, y_, x_pivot, y_pivot), x_pivot, y_pivot, dir.second, dir.first, 0, 0, 1/startSlope, false});
+      openSet_->push(Node{7, evaluateDistance(x_, y_, x_pivot, y_pivot), x_pivot, y_pivot, dir.second, dir.first, 0, 0, startSlope, false});
     }
   }
 // ****************** First secondary march ********************************************************
   int x_pri = x_start;
   int y_pri = y_start;
   // march start postition to a visble point behind the start slope
-  while (secondaryDist < primaryDist*startSlope) {
+  while (!onParentSide(dir.second, primaryDist, secondaryDist, startSlope, false)) {
     if (advance(x_pri, y_pri, dir.second))
       secondaryDist++;
     else 
@@ -408,7 +406,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
   if (getDistance(x_pri, y_pri, dir.first, true) == infinity)
     return;
   // assign distance value to first valid position
-  if (secondaryDist >= primaryDist*startSlope) {
+  if (onParentSide(dir.second, primaryDist, secondaryDist, startSlope, false)) {
     gScore_(x_pri,y_pri) = evaluateDistance(x_pri,y_pri,x_,y_);
     cameFrom_(x_pri,y_pri) = startPoint_;
   }
@@ -418,7 +416,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
   bool outOfBound;
   bool marchOverSame = false;
   if (blockSlope == infinity) {
-    blockSlope = (secondaryDist + gapWidth + 0.5)/(primaryDist-0.5);
+    blockSlope = calcSlope(dir.second, primaryDist - 0.5, secondaryDist + gapWidth + 0.5);
   }
   else {
     marchOverSame = true;
@@ -426,7 +424,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
   // effectively march over first direction
   int x_sec = x_pri;
   int y_sec = y_pri;
-  march_to_slope(dir.second, x_sec, y_sec, startPoint_, primaryDist, secondaryDist, blockSlope, visibilityDist, marchOverBlock, outOfBound);
+  march_to_slope(dir.second, x_sec, y_sec, primaryDist, secondaryDist, blockSlope, visibilityDist, marchOverBlock, outOfBound);
 
   if (marchOverBlock) {
     // object right below the jump line
@@ -449,7 +447,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
       if (sharedConfig_->debugCardinalSearch) {
         std::cout << "  -> First secondary march: marched against same object\n";
       }
-      blockSlope = (secondaryDist + visibilityDist + 0.5) / (primaryDist + 0.5);
+      blockSlope = calcSlope(dir.second, primaryDist + 0.5, secondaryDist + visibilityDist + 0.5);
     }
     // extreme slope detected
     else { 
@@ -457,7 +455,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
         std::cout << "  -> First secondary march: extreme slope detected \n";
       }
       if (!outOfBound) {
-        blockSlope = (secondaryDist + visibilityDist + 0.5) / (primaryDist + 0.5);
+        blockSlope = calcSlope(dir.second, primaryDist + 0.5, secondaryDist + visibilityDist + 0.5);
       }
       processSteepSlope(dir, x_sec, y_sec, secondaryDist+visibilityDist-prevVisibilityDist);
     }
@@ -487,7 +485,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
   //-----------------advance secondary directon------------------------
     x_sec = x_pri;
     y_sec = y_pri;
-    march_to_slope(dir.second, x_sec, y_sec, startPoint_, primaryDist, secondaryDist, blockSlope, visibilityDist, marchOverBlock, outOfBound);
+    march_to_slope(dir.second, x_sec, y_sec, primaryDist, secondaryDist, blockSlope, visibilityDist, marchOverBlock, outOfBound);
 
   // __marchOver: new line of sight__
     if (marchOverBlock && !marchOverSame) {
@@ -506,7 +504,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
       if (secondaryDist + visibilityDist != prevVisibilityDist) {
         processJump(dir, x_sec, y_sec, primaryDist, secondaryDist+visibilityDist+1, blockSlope, visibilityDist, prevVisibilityDist);
       }
-      blockSlope = (secondaryDist + visibilityDist + 0.5) / (primaryDist + 0.5);
+      blockSlope = calcSlope(dir.second, primaryDist + 0.5, secondaryDist + visibilityDist + 0.5);
       marchOverSame = false;
     }
     prevVisibilityDist = secondaryDist + visibilityDist;

@@ -61,7 +61,7 @@ void Solver::reset() {
   // reset the fields
   gScore_.reset(nx_, ny_, infinity);
   cameFrom_.reset(nx_, ny_, nullPoint_);
-  secondaryDir_.reset(nx_, ny_, cardir::None);
+  pivotDir_.reset(nx_, ny_, {cardir::None, cardir::None});
   blockCorners_.reset(nx_, ny_, nullPoint_);
 
   openSet_.reset();
@@ -364,7 +364,7 @@ void Solver::saveVisibilityBasedSolverImage(const Field<double> &gScore) const {
     for (int i = 0; i < width; ++i) {
       for (int j = 0; j < height; ++j) {
         double value = gScore(i, j);
-        if (std::abs(value - level) <= stepSize / (2*number_of_contour_lines)) {
+        if (std::abs(value - level) <= stepSize / 15) {
           image.setPixel(i, j, sf::Color::Black);
         }
       }
@@ -373,7 +373,6 @@ void Solver::saveVisibilityBasedSolverImage(const Field<double> &gScore) const {
 }
 // color initial position as a white circle
   int radius = nx_ / 120;
-
   for (int i = -radius; i <= radius; ++i) {
     for (int j = -radius; j <= radius; ++j) {
       if (i * i + j * j <= radius * radius) {
@@ -387,19 +386,14 @@ void Solver::saveVisibilityBasedSolverImage(const Field<double> &gScore) const {
   if (colorPivots_) {
     for (size_t idx = 0; idx < nb_of_pivots_; ++idx) {
       sf::Color pivot_color = getPivotColor(pivots_[idx].first, pivots_[idx].second, sharedConfig_->pivotColorGridSize);
-      image.setPixel(pivots_[idx].first, pivots_[idx].second, pivot_color);
-      // color all adjacent points if they are in bounds
-      if (pivots_[idx].first - 1 >= 0) {
-        image.setPixel(pivots_[idx].first - 1, pivots_[idx].second, pivot_color);
-      }
-      if (pivots_[idx].first + 1 < nx_) {
-        image.setPixel(pivots_[idx].first + 1, pivots_[idx].second, pivot_color);
-      }
-      if (pivots_[idx].second - 1 >= 0) {
-        image.setPixel(pivots_[idx].first, pivots_[idx].second - 1, pivot_color);
-      }
-      if (pivots_[idx].second + 1 < ny_) {
-        image.setPixel(pivots_[idx].first, pivots_[idx].second + 1, pivot_color);
+      for (int i = -radius; i <= radius; ++i) {
+        for (int j = -radius; j <= radius; ++j) {
+          if (i * i + j * j <= radius * radius) {
+            if (pivots_[idx].first + i >= 0 && pivots_[idx].first + i < nx_ && pivots_[idx].second + j >= 0 && pivots_[idx].second + j < ny_) {
+              image.setPixel(pivots_[idx].first + i, pivots_[idx].second + j, sf::Color::Magenta);
+            }
+          }
+        }
       }
     }
   }

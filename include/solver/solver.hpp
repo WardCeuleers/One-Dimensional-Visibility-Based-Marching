@@ -60,7 +60,7 @@ private:
 
   Field<double> gScore_;       // Distance value to the start position
   Field<point> cameFrom_;      // Parent coordinates
-  Field<cardir> secondaryDir_; // Pivot secondary direction 
+  Field<searchdir> pivotDir_;  // Pivot search direction 
   Field<point> blockCorners_;  // Reference to corner blocking line of sight between parent & child
 
   std::shared_ptr<Config> sharedConfig_;
@@ -119,16 +119,14 @@ private:
   return (gScore_(current) + sqrt((current.first - x) * (current.first - x) + (current.second - y) * (current.second - y)) <= 
             gScore_(other) + sqrt((other.first - x) * (other.first - x) + (other.second - y) * (other.second - y)));
   };
-  inline float invertSlope(const float& slope) {
-    double preciseSlope = static_cast<double>(slope);
-    return static_cast<float>(1.0/preciseSlope);
-  };
 
   // ========= utility functions ==================================================================================
   int const evaluateCardinalDistance(const cardir& dir, const point& p1, const point& p2);
   int const evaluateCardinalDistance(const cardir& dir, const int& x1, const int& y1, const int& x2, const int& y2);
+  int const evaluateAbsoluteCardinalDistance(const cardir& dir, const int& x1, const int& y1, const int& x2, const int& y2);
   double const getDistance(int x, int y, cardir dir_1, bool reverse = false);
   int const distanceToEdge(const cardir& dir, const int& x, const int& y);
+  bool const onParentSide(const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist, const float& slope, bool innerSide = true);
   void const forceMove(int& x, int& y, const cardir& dir, int steps = 1);
   void const forceMove(int& x, int& y, const cardir& dir_1, int steps_1, const cardir& dir_2, int steps_2);
   bool const move(int& x, int& y, const cardir& dir, int steps = 1);
@@ -144,12 +142,14 @@ private:
   bool const nextToSibling(const int& x, const int& y, const cardir& dir, const point& parent, bool reverse=false);
   point getNeighbour(const int& x, const int& y, const cardir& dir, bool reverse = false);
   point getPivot(const int& x, const int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist);
+  float const calcSlope(const cardir& secondaryDir, const float& primaryDist, const float& secondaryDist);
   float const calcBlockSlope(const cardir& primaryDir, const cardir& secondaryDir, const point& parent, const point& block);
+  bool const smallerSlope(const cardir& primaryDir, const float& oldSlope, const float& newSlope);
 
 // ========= origin visibility functions ==========================================================================
   int  traverseObject(int& x, int& y, searchdir dir, const double maxMarchDist);
   int  traverseVoid(int& x, int& y, cardir dir, const double maxMarchDist);
-  void march_to_slope(cardir dir, int& x, int& y, point parent, const int& primaryDist, const int& secondaryDist, const float& slope, int& visibilityDist, bool& marchBool, bool& outOfBound);
+  void march_to_slope(cardir dir, int& x, int& y, const int& primaryDist, const int& secondaryDist, const float& slope, int& visibilityDist, bool& marchBool, bool& outOfBound);
   int  advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primaryDist, int& secondaryDist, float& primarySlope);
   void processSteepSlope(searchdir dir, int& x, int& y, const int visibilityDiff);
   void processMarchOver(searchdir dir, int& x, int& y, const float slope, const int visibilityDiff);
@@ -165,7 +165,8 @@ private:
   bool addNextParentSlopePrimary(const double& distance, int x, int y, const cardir& primaryDir, const cardir& secondaryDir, int primaryDist, int secondaryDist, const float& slope, bool onVisiblePoint);
   bool advanceSecondaryNode(double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist,  int& secondaryDist, bool& moveBoundary, bool checkCFStart=true);
   bool advanceOccupiedNode(double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist,  int& secondaryDist);
-  bool advancePivotSearch(double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, int& primaryDist, const int& secondaryDist, float& slope, bool& nextToObject);
+  void processBackSideObject(const point& parent, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist, const float& blockSlope);
+  bool advancePivotSearch(double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, int& primaryDist, int& secondaryDist, float& slope, bool& nextToObject);
   bool addNextSwitchedPrimary(const double& distance, int x, int y, const cardir& primaryDir, const cardir& secondaryDir, int primaryDist, const int& secondaryDist, bool moveBoundary, bool initialCall);
 };
 
