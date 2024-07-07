@@ -3,6 +3,7 @@
 
 #include "solver/solver.hpp"
 #include <iostream>
+#include <iomanip>
 
 namespace vbd {
 	
@@ -120,15 +121,15 @@ bool const Solver::onParentSide(const cardir& secondaryDir, const int& primaryDi
     case cardir::North:
     case cardir::South:
       if (innerSide)
-        return primaryDist >= secondaryDist*slope;
+        return primaryDist >= secondaryDist*(double)slope;
       else 
-        return primaryDist <= secondaryDist*slope;
+        return primaryDist <= secondaryDist*(double)slope;
     case cardir::East:
     case cardir::West:
       if (innerSide) 
-        return primaryDist*slope >= secondaryDist;
+        return primaryDist*(double)slope >= secondaryDist;
       else
-        return primaryDist*slope <= secondaryDist;
+        return primaryDist*(double)slope <= secondaryDist;
     default:
       std::cout << "Error: invalid direction for onVisibleSide" << std::endl;
       return false;
@@ -680,6 +681,69 @@ bool const Solver::smallerSlope(const cardir& primaryDir, const float& oldSlope,
       return (newSlope > oldSlope);
     default:
       std::cout << "Error: invalid direction in smallerSlope" << std::endl;
+      return false;
+  }
+}
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
+bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& primaryDist, const float& startSlope, const float& blockSlope) {
+  if (startSlope == 0) {return true;}
+  int unVisibleSecondaryDist;  // secondary dist of the first unvisble point behind the blockslope on the current primary axis
+  int visiblePrimaryDist;      // primary dist of the first visble point behind the blockslope on the unVisibleSecondaryDist axis
+  switch (secondaryDir) {
+    case cardir::North:
+    case cardir::South:
+      // set unvisible and visible distance
+      unVisibleSecondaryDist = ceil(primaryDist/blockSlope); 
+      visiblePrimaryDist = ceil(unVisibleSecondaryDist*blockSlope);
+      // if the next point is outside of the map
+      if (visiblePrimaryDist > primaryDist + distanceToEdge(primaryDir, x, y))
+        return true;
+      // check for valid path between slopes
+      return (unVisibleSecondaryDist-1 >= visiblePrimaryDist/startSlope);
+    case cardir::East:
+    case cardir::West:
+      unVisibleSecondaryDist = ceil(primaryDist*blockSlope);
+      visiblePrimaryDist = ceil(unVisibleSecondaryDist/blockSlope);
+      // if the next point is outside of the map
+      if (visiblePrimaryDist > primaryDist + distanceToEdge(primaryDir, x, y))
+        return true;
+      // check for valid path between slopes
+      return (unVisibleSecondaryDist-1 >= visiblePrimaryDist*startSlope);
+    default:
+      std::cout << "Invalid direction while checking for a Valid MarchOver Path\n";
+      return false;
+  }
+}
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
+bool Solver::checkValidPathFront(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& primaryDist, const int& secondaryDist, const float& startSlope, const float& blockSlope) {
+  double nextPointDistance;
+  //starting point on edge of map
+  if (distanceToEdge(primaryDir, x, y) == 0)
+    return true;
+  // check for valid path
+  switch(secondaryDir) {
+    case cardir::North:
+    case cardir::South:
+      nextPointDistance = ceil((primaryDist+1)/startSlope);
+      // if the next point is outside of the map
+      if (nextPointDistance > secondaryDist + distanceToEdge(secondaryDir, x, y))
+        return true;
+      // check for valid path between slopes
+      return (primaryDist >= nextPointDistance*blockSlope);
+    case cardir::East:
+    case cardir::West:
+      nextPointDistance = ceil((primaryDist+1)*startSlope);
+      // if the next point is outside of the map
+      if (nextPointDistance > secondaryDist + distanceToEdge(secondaryDir, x, y))
+        return true;
+      // check for valid path between slopes
+      return (primaryDist >= nextPointDistance/blockSlope);
+    default:
+      std::cout << "Invalid direction in checkValidJumpPath\n";
       return false;
   }
 }

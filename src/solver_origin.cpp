@@ -96,41 +96,66 @@ void Solver::march_to_slope(cardir dir, int& x, int& y, const int& primaryDist, 
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-int Solver::advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primaryDist, int& secondaryDist, float& primarySlope) {
+int Solver::advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primaryDist, int& secondaryDist, float& primarySlope, bool& onFirstPrimary) {
+  // check if the start is next to an object
+  bool prevInObject = checkBackwards(x, y, dir.second);
+  float blockSlope;
   // march in primary direction and return error if out of bounds
   if(!move(x, y, dir.first))
-    return 3;
+    return 2;
   primaryDist++;
-  bool clipping = false;
-  float clippingSlope;
+  // check if point above first primary is occupied
+  if (checkBackwards(x, y, dir.second)) {
+    prevInObject = true;
+    blockSlope = calcSlope(dir.second, primaryDist - 0.5, secondaryDist - 0.5);
+    if (smallerSlope(dir.first, blockSlope, primarySlope)) {
+      primarySlope = blockSlope;
+    }
+  }
   // march in secondary direction untill you are past the slope or out of bounds
   while (!onParentSide(dir.second, primaryDist, secondaryDist, primarySlope, false)) {
+    if (sharedOccupancyField_->get(x, y)) {
+      prevInObject = true;
+      blockSlope = calcSlope(dir.second, primaryDist - 0.5, secondaryDist + 0.5);
+      if (smallerSlope(dir.first, blockSlope, primarySlope)) {
+        primarySlope = blockSlope;
+      }
+    }
+    else {
+      if (prevInObject && !onFirstPrimary) {
+        if (reverse(x, y, dir.first)) {
+          if (sharedConfig_->debugCardinalSearch) {
+            std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): object touching slope\n";
+          }
+          openSet_->push(Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, dir.first, 0, 0, primarySlope, false});
+        }
+        forceMove(x, y, dir.first);
+      }
+      prevInObject = false;
+    }
     if(!move(x, y, dir.second))
-      return 3;
+      return 2;
+    onFirstPrimary = false;
     secondaryDist++;
-    // check for valid path to the current point
+    // check for valid path to the next point
     if (getDistance(x, y, dir.first, true) == infinity) 
-      return 3;
+      return 2;
   }
   // check for object at end of march
-  if (!sharedOccupancyField_->get(x, y)) {
-    if (clipping)
-      return 1;
-    else
-      return 0;
-  }
+  if (sharedOccupancyField_->get(x, y))
+    return 1;
   else
-    return 2;
+    return 0;
 }
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-void Solver::processSteepSlope(searchdir dir, int& x, int& y, const int visibilityDiff) {
+void Solver::processSteepSlope(searchdir dir, int& x, int& y, const int primaryDist, const int secondaryDist, const int visibilityDiff) {
   if (sharedConfig_->debugCardinalSearch) {
     std::cout <<  "-----SteepSlope detected at (" << x << ", " << ny_-1-y << ")-----\n";
   }
   int march_dist = 0;
-  bool foundGap = false;
+  bool foundGap = !checkBackwards(x, y, dir.first);
   for (march_dist; march_dist < visibilityDiff-1; march_dist++) {
     if (!foundGap && !checkBackwards(x, y, dir.first, dir.second)) {
       foundGap = true;
@@ -140,7 +165,7 @@ void Solver::processSteepSlope(searchdir dir, int& x, int& y, const int visibili
         std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): gap pivot\n";
       }
       // create pivot with direction ortogonal to current
-      openSet_->push(Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, 0, false});
+      openSet_->push(Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -calcSlope(dir.second, primaryDist-0.5, secondaryDist-march_dist), false});
       foundGap = false; 
     }
     forceMove(x, y, dir.second, -1);
@@ -149,19 +174,23 @@ void Solver::processSteepSlope(searchdir dir, int& x, int& y, const int visibili
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, const int visibilityDiff) {
+void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, const int visibilityDiff, float pivotSlope) {
   if (sharedConfig_->debugCardinalSearch) {
     std::cout <<  "-----MarchOver detected at (" << x << ", " << ny_-1-y << ")-----\n";
     std::cout << "       stopSlope   = " << slope << "\n";
+    if (pivotSlope != 0)
+      std::cout << "      pivotSlope   = " << pivotSlope << "\n";
   }
   forceMove(x, y, dir.second, -1);
+  if (pivotSlope == 0)
+    pivotSlope = slope;
   // for small visibiltiyDiff, gap and march beyond are impossible
   if (visibilityDiff <= 1) {
     if (sharedConfig_->debugPivotCreation) {
       std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): small visibility diff\n";
     }
     // create pivot with same direction
-    openSet_->push(Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, slope, false});
+    openSet_->push(Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, pivotSlope, false});
     return;
   }
   //if large visibilityDiff, add only lowest possible pivot
@@ -172,7 +201,7 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
       std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): object next to start\n";
     }
     // create pivot with same direction
-    pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, slope, false};
+    pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, pivotSlope, false};
   }
   // else marchover location is beyond the object -> march back to the object
   else {
@@ -184,7 +213,7 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
       std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): object after marchdown\n";
     }
     // create pivot with direction ortogonal to current
-    pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -slope, false};
+    pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -pivotSlope, false};
   }
   // if the march is not at the previous visibility -> their could be a gap 
   for (march_dist; march_dist < visibilityDiff-1; march_dist++) {
@@ -197,12 +226,15 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
         std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): gap pivot\n";
       }
       // create pivot with direction ortogonal to current
-      pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -slope, false};
+      pivot = Node{7, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -pivotSlope, false};
       foundGap = false; 
     }
     forceMove(x, y, dir.second, -1);
   }
   // push the last found node
+  if (sharedConfig_->debugPivotCreation) {
+    std::cout << "  -> pushed the pivot at (" << pivot.x << ", " << ny_-1-pivot.y << ")\n";
+  }
   openSet_->push(pivot);
 }
 /*****************************************************************************/
@@ -302,7 +334,7 @@ void Solver::ComputeDistanceFromCarindal(searchdir dir, const int basePrimaryVis
   // ------ line of sight not reached --------
     // visibility increased while not marching over line of of sight
     else if (!marchOverSame && prevVisibilityDist < visibilityDist) {
-      processSteepSlope(dir, x_sec, y_sec, visibilityDist-prevVisibilityDist);
+      processSteepSlope(dir, x_sec, y_sec, primaryDist, visibilityDist, visibilityDist-prevVisibilityDist);
     }
     // jump due to edge of the map
     else if (outOfBound) {}
@@ -457,45 +489,42 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
       if (!outOfBound) {
         blockSlope = calcSlope(dir.second, primaryDist + 0.5, secondaryDist + visibilityDist + 0.5);
       }
-      processSteepSlope(dir, x_sec, y_sec, secondaryDist+visibilityDist-prevVisibilityDist);
+      processSteepSlope(dir, x_sec, y_sec, primaryDist, secondaryDist, secondaryDist+visibilityDist-prevVisibilityDist);
     }
   }
   prevVisibilityDist = secondaryDist + visibilityDist;
 // ****************** Marching ********************************************************
+  bool onFirstPrimary = true;
   while (true) {
   //-----------------advance primary direction------------------------
-    int advanceResult = advancePrimaryVisibility(dir, x_pri, y_pri, primaryDist, secondaryDist, startSlope); 
-    // successful march without clipping
+    int advanceResult = advancePrimaryVisibility(dir, x_pri, y_pri, primaryDist, secondaryDist, startSlope, onFirstPrimary); 
+    // successful primary march
     if (advanceResult == 0) {
       gScore_(x_pri,y_pri) = evaluateDistance(x_pri,y_pri,x_,y_);
       cameFrom_(x_pri,y_pri) = startPoint_;
     }
-    // successful march with clipping
-    else if (advanceResult == 1) {
-      gScore_(x_pri,y_pri) = evaluateDistance(x_pri,y_pri,x_,y_);
-      cameFrom_(x_pri,y_pri) = startPoint_;
-      processJump(dir, x_pri, y_pri, primaryDist, secondaryDist, blockSlope, -1, prevVisibilityDist, false);
-      return;
-    }
-    // if march over primary direction was unsuccesfull
-    else if (advanceResult == 2)
-        break;
-    else // advanceResult == 3
+    // unsuccesfull primary march: hit object
+    else if (advanceResult == 1)
+      break;
+    // unsuccesfull primary march: out of bounds or invalid path
+    else
       return;
   //-----------------advance secondary directon------------------------
     x_sec = x_pri;
     y_sec = y_pri;
     march_to_slope(dir.second, x_sec, y_sec, primaryDist, secondaryDist, blockSlope, visibilityDist, marchOverBlock, outOfBound);
-
+    
   // __marchOver: new line of sight__
     if (marchOverBlock && !marchOverSame) {
       marchOverSame = true;
-      processMarchOver(dir, x_sec, y_sec, blockSlope, secondaryDist+visibilityDist-prevVisibilityDist);
+      // check if there is a continous path between the start and stop slope
+      if (checkValidPathBack(dir.first, dir.second, x_sec, y_sec, primaryDist, startSlope, blockSlope))
+        processMarchOver(dir, x_sec, y_sec, blockSlope, secondaryDist+visibilityDist-prevVisibilityDist);
+      else 
+        processMarchOver(dir, x_sec, y_sec, blockSlope, secondaryDist+visibilityDist-prevVisibilityDist, startSlope);
     } 
   // __marchOver: same line of sight or stop line __
-    else if (marchOverBlock) {
-
-    }
+    else if (marchOverBlock) {}
   // __line of sight not reached__
     // -> jump due to edge of the map
     else if (outOfBound) {}

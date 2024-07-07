@@ -57,11 +57,13 @@ void Solver::reset() {
   y_ = ny_ - 1 - sharedConfig_->pos_y;
   startPoint_ = point(x_, y_);
   nullPoint_ = point(nx_+1, ny_+1);
+  nullidx_ = nx_ * ny_;
   endPoint_ = nullPoint_;
   // reset the fields
   gScore_.reset(nx_, ny_, infinity);
   cameFrom_.reset(nx_, ny_, nullPoint_);
   pivotDir_.reset(nx_, ny_, {cardir::None, cardir::None});
+  slopeOrigin_.reset(nx_, ny_, nullidx_);
   blockCorners_.reset(nx_, ny_, nullPoint_);
 
   openSet_.reset();
@@ -142,6 +144,9 @@ void Solver::visibilityBasedSolver() {
         case 7:
           std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on pivot creation\n";
           break;
+        case 8:
+          std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on cutoff primary\n";
+          break;
         default:
           break;
       }
@@ -150,7 +155,7 @@ void Solver::visibilityBasedSolver() {
 
     // secondary search
     if (curNode.type == 0) {
-      if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
+      if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
         openSet_->push(curNode);
       }
     }
@@ -160,7 +165,7 @@ void Solver::visibilityBasedSolver() {
       if (curNode.type == 1) {
         addNextStraightPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist);
         curNode.type = 0;
-        if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
+        if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
           openSet_->push(curNode);
         }
       }
@@ -170,7 +175,7 @@ void Solver::visibilityBasedSolver() {
         curNode.type = 0;
         if (curNode.state) {
           curNode.state = false;
-          if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
+          if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
             openSet_->push(curNode);
           }
         }
@@ -181,7 +186,7 @@ void Solver::visibilityBasedSolver() {
           curNode.type = 0;
           if (curNode.state) {
             curNode.state = false;
-            if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
+            if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
               openSet_->push(curNode);
             }
           }
@@ -205,14 +210,18 @@ void Solver::visibilityBasedSolver() {
       if (addNextSwitchedPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state, false)) {
         curNode.type = 0;
         curNode.state = false;
-        if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
+        if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
           openSet_->push(curNode);
         }
       }
     }
     // pivot creation
     else if (curNode.type == 7) {
-      createNewPivot({curNode.x, curNode.y}, cameFrom_(curNode.x, curNode.y), curNode.primaryDir, curNode.secondaryDir, curNode.slope);
+      createNewPivot({curNode.x, curNode.y}, cameFrom_(curNode.x, curNode.y), curNode.primaryDir, curNode.secondaryDir, curNode.slope, curNode.state);
+    }
+    // cutoffprimary
+    else if (curNode.type == 8) {
+      addNextCutOffPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state);
     }
     // invalid type
     else {
