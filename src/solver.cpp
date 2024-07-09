@@ -136,23 +136,16 @@ void Solver::visibilityBasedSolver() {
           std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on occupied point\n";
           break;
         case 5:
-          std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on pivot correction\n";
-          break;
-        case 6:
           std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on switched search\n";
           break;
-        case 7:
+        case 6:
           std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on pivot creation\n";
-          break;
-        case 8:
-          std::cout << "Node (" << curNode.x << ", " << ny_-1-curNode.y << ") on cutoff primary\n";
           break;
         default:
           break;
       }
       endPoint_ = point(curNode.x, curNode.y);
     }
-
     // secondary search
     if (curNode.type == 0) {
       if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
@@ -163,32 +156,32 @@ void Solver::visibilityBasedSolver() {
     else if (curNode.type <= 3) { 
       // straight primary
       if (curNode.type == 1) {
-        addNextStraightPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist);
-        curNode.type = 0;
-        if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
+        addNextStraightPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.state);
+        if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, false, curNode.state)) {
+          curNode.type = 0;
+          curNode.state = false;
           openSet_->push(curNode);
         }
       }
       // pivot slope primary
       else if (curNode.type == 2) {
-        addNextPivotSlopePrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state);
-        curNode.type = 0;
+        addNextSlopePrimary(curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state, false);
         if (curNode.state) {
-          curNode.state = false;
+          curNode.state = true;
           if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
+            curNode.type = 0;
             openSet_->push(curNode);
           }
         }
       }
       // parent slope primary
       else {
-        if (addNextParentSlopePrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
-          curNode.type = 0;
-          if (curNode.state) {
-            curNode.state = false;
-            if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
-              openSet_->push(curNode);
-            }
+        addNextSlopePrimary(curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state, true);
+        if (curNode.state) {
+          curNode.state = false;
+          if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
+            curNode.type = 0;
+            openSet_->push(curNode);
           }
         }
       }
@@ -199,29 +192,19 @@ void Solver::visibilityBasedSolver() {
         openSet_->push(curNode);
       }
     }
-    // pivot correction
-    else if (curNode.type == 5) {
-      if(advancePivotSearch(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
-        openSet_->push(curNode);
-      }
-    }
     // switched pivot 
-    else if (curNode.type == 6) {
-      if (addNextSwitchedPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state, false)) {
-        curNode.type = 0;
+    else if (curNode.type == 5) {
+      if (addNextSwitchedPrimary(curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
         curNode.state = false;
         if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
+          curNode.type = 0;
           openSet_->push(curNode);
         }
       }
     }
     // pivot creation
-    else if (curNode.type == 7) {
+    else if (curNode.type == 6) {
       createNewPivot({curNode.x, curNode.y}, cameFrom_(curNode.x, curNode.y), curNode.primaryDir, curNode.secondaryDir, curNode.slope, curNode.state);
-    }
-    // cutoffprimary
-    else if (curNode.type == 8) {
-      addNextCutOffPrimary(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state);
     }
     // invalid type
     else {
@@ -411,7 +394,8 @@ void Solver::saveVisibilityBasedSolverImage(const Field<double> &gScore) const {
     for (int i = 0; i < width; ++i) {
       for (int j = 0; j < height; ++j) {
         if (blockCorners_(i, j) != nullPoint_) {
-          image.setPixel(i, j, sf::Color::Magenta);
+          sf::Color color = getColor(indexAt(blockCorners_(i, j).first, blockCorners_(i, j).second) / (1.0*nx_ * ny_));
+          image.setPixel(i, j, color);
         }
       }
     }
