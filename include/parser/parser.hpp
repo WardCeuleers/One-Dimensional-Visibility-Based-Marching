@@ -22,7 +22,6 @@ struct Config {
   std::vector<int> objectList;
   std::string imagePath = "C:\\..."; // or /home/...
   bool marchControl = false;
-  size_t marchStepSize = 1;
   int pos_x;
   int pos_y;
   bool timer = true;

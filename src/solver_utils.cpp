@@ -117,6 +117,7 @@ int const Solver::distanceToEdge(const cardir& dir, const int& x, const int& y) 
 /*****************************************************************************/
 /*****************************************************************************/
 bool const Solver::onVisibleSide(const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist, const float& slope, bool SlopeOfParent) {
+  if (slope == 0) {return secondaryDist > 0;}
   switch(secondaryDir) {
     case cardir::North:
     case cardir::South:
@@ -705,7 +706,7 @@ bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondar
         return true;
       startVisibleDist = floor((secParentPivotDist + secondaryDist)*startSlope);
       // if the next point is outside of the map
-      if (startVisibleDist > primParentPivotDist + primaryDist + distanceToEdge(primaryDir, x, y))
+      if (startVisibleDist > primParentPivotDist + distanceToEdge(primaryDir, pivot.first, pivot.second))
         return true;
       // check startVisibleDist is larger then distance to first visble point on next secondary axis
       return (startVisibleDist - primParentPivotDist >= ceil((secondaryDist + 1)*blockSlope));
@@ -716,7 +717,7 @@ bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondar
         return true;
       startVisibleDist = floor((secParentPivotDist + secondaryDist)/startSlope);
       // if the next point is outside of the map
-      if (startVisibleDist > primParentPivotDist + primaryDist + distanceToEdge(primaryDir, x, y))
+      if (startVisibleDist > primParentPivotDist + distanceToEdge(primaryDir, pivot.first, pivot.second))
         return true;
       // check for valid path between slopes
       return (startVisibleDist - primParentPivotDist >= ceil((secondaryDist + 1)/blockSlope));
@@ -728,31 +729,35 @@ bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondar
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-bool Solver::checkValidPathFront(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& primaryDist, const int& secondaryDist, const float& startSlope, const float& blockSlope) {
-  double nextPointDistance;
-  //starting point on edge of map
-  if (distanceToEdge(primaryDir, x, y) == 0)
-    return true;
-  // check for valid path
-  switch(secondaryDir) {
+bool Solver::checkValidPathFront(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& secondaryDist, const float& blockSlope, const float& stopSlope, const point& pivot) {
+  if (stopSlope == 0) {return true;}
+  int primaryDist;       // primary axis of the last visible point on the given secondary axis  
+  int stopVisibleDist;  // secondary dist of the first visible point before the stop slope on the current primary axis
+  switch (secondaryDir) {
     case cardir::North:
     case cardir::South:
-      nextPointDistance = ceil((primaryDist+1)/startSlope);
-      // if the next point is outside of the map
-      if (nextPointDistance > secondaryDist + distanceToEdge(secondaryDir, x, y))
+      primaryDist = floor(secondaryDist*blockSlope);
+      if (primaryDist > distanceToEdge(primaryDir, pivot.first, pivot.second))
         return true;
-      // check for valid path between slopes
-      return (primaryDist >= nextPointDistance*blockSlope);
+      stopVisibleDist = floor(primaryDist/stopSlope);
+      // if the next point is outside of the map
+      if (stopVisibleDist > distanceToEdge(secondaryDir, pivot.first, pivot.second))
+        return true;
+      // check startVisibleDist is larger then distance to first visble point on next secondary axis
+      return (stopVisibleDist >= ceil((primaryDist + 1)/blockSlope));
     case cardir::East:
     case cardir::West:
-      nextPointDistance = ceil((primaryDist+1)*startSlope);
-      // if the next point is outside of the map
-      if (nextPointDistance > secondaryDist + distanceToEdge(secondaryDir, x, y))
+      primaryDist = floor(secondaryDist/blockSlope);
+      if (primaryDist > distanceToEdge(primaryDir, pivot.first, pivot.second))
         return true;
-      // check for valid path between slopes
-      return (primaryDist >= nextPointDistance/blockSlope);
+      stopVisibleDist = floor(primaryDist*stopSlope);
+      // if the next point is outside of the map
+      if (stopVisibleDist > distanceToEdge(secondaryDir, pivot.first, pivot.second))
+        return true;
+      // check startVisibleDist is larger then distance to first visble point on next secondary axis
+      return (stopVisibleDist >= ceil((primaryDist + 1)*blockSlope));
     default:
-      std::cout << "Invalid direction in checkValidJumpPath\n";
+      std::cout << "Invalid direction while checking for a Valid path front\n";
       return false;
   }
 }

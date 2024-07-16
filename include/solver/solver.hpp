@@ -148,13 +148,13 @@ private:
   bool const smallerSlope(const cardir& primaryDir, const float& oldSlope, const float& newSlope);
   bool checkValidPathBack(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& primaryDist, const float& startSlope, const float& blockSlope, const point& pivot);
   bool checkValidPathBack(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& primaryDist, const float& startSlope, const float& blockSlope, const point& pivot, const point& slopeParent);
-  bool checkValidPathFront(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& primaryDist, const int& secondaryDist, const float& startSlope, const float& blockSlope);
+  bool checkValidPathFront(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& primaryDist, const float& startSlope, const float& blockSlope, const point& pivot);
 
 // ========= origin visibility functions ==========================================================================
   int  traverseObject(int& x, int& y, searchdir dir, const double maxMarchDist);
   int  traverseVoid(int& x, int& y, cardir dir, const double maxMarchDist);
-  void march_to_slope(cardir dir, int& x, int& y, const int& primaryDist, const int& secondaryDist, const float& slope, int& visibilityDist, bool& marchBool, bool& outOfBound);
-  int  advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primaryDist, int& secondaryDist, float& primarySlope, bool& onFirstPrimary);
+  void march_to_slope(searchdir dir, int& x, int& y, const int& primaryDist, const int& secondaryDist, float& slope, int& visibilityDist, const int& prevVisibilityDist, bool& marchBool, bool& outOfBound, bool& marchOverSame);
+  int  advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primaryDist, int& secondaryDist, float& primarySlope, float& stopSlope, bool& onFirstPrimary);
   void processSteepSlope(searchdir dir, int& x, int& y, const int primaryDist, const int secondaryDist, const int visibilityDiff);
   void processMarchOver(searchdir dir, int& x, int& y, const float slope, const int visibilityDiff, float pivotSlope = 0);
   void processJump(searchdir dir, int& x, int& y, const int primaryDist, const int secondaryDist, const float stopSlope, const int visibilityDist, const int prevVisibilityDist, bool traverseFirstObject = true);
@@ -166,9 +166,9 @@ private:
   void createNewPivot(const point pivot, const point parent, const cardir primaryDirt, const cardir secondaryDir, float slope, bool adaptedSlope);
   void addNextStraightPrimary(const double& distance, int x, int y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, bool OnVisibleSide);
   bool setSlopePrimaryDistance(const double& distance, const int& x, const int& y, const point& pivot, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist);
-  void addNextSlopePrimary(int x, int y, const cardir& primaryDir, const cardir& secondaryDir, int primaryDist, int secondaryDist, float& slope, bool fromVisiblePoint, bool parentSlope);
+  bool addNextSlopePrimary(int x, int y, const cardir& primaryDir, const cardir& secondaryDir, int primaryDist, int secondaryDist, float& slope, bool fromVisiblePoint, bool parentSlope);
   bool advanceSecondaryNode(double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist,  int& secondaryDist, const float& slope, const bool& fromPivotSlope, bool onVisibleSide=true);
-  bool processBoundaryPoint(int& x, int& y, const double& distance, const point& pivot, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist, const float& slope, const float& blockslope, const point& block, const bool& fromPivotSlope);
+  bool processBoundaryPoint(int& x, int& y, const double& distance, const point& pivot, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist, const float& slope, float blockslope, point& block, const bool& fromPivotSlope, bool adaptedSlope);
   bool advanceOccupiedNode(double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist,  int& secondaryDist);
   void addInitialSwitchedPrimary(const point& pivot, int x, int y, const cardir& primaryDir, const cardir& secondaryDir, int primaryDist, int secondaryDist);
   bool addNextSwitchedPrimary(int x, int y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist, bool firstMarch);

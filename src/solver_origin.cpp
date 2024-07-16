@@ -76,13 +76,22 @@ int Solver::traverseVoid(int& x, int& y, cardir dir, const double maxMarchDist) 
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-void Solver::march_to_slope(cardir dir, int& x, int& y, const int& primaryDist, const int& secondaryDist, const float& slope, int& visibilityDist, bool& marchBool, bool& outOfBound) {
+void Solver::march_to_slope(searchdir dir, int& x, int& y, const int& primaryDist, const int& secondaryDist, float& slope, int& visibilityDist, const int& prevVisibilityDist, bool& marchBool, bool& outOfBound, bool& marchOverSame) {
   visibilityDist = 0;
   marchBool = false;
   outOfBound = false;
-  while (advance(x, y, dir, outOfBound)) {
+  while (advance(x, y, dir.second, outOfBound)) {
     visibilityDist++;
-    if (!onVisibleSide(dir, primaryDist, visibilityDist + secondaryDist, slope)) {
+    if (marchOverSame && visibilityDist > prevVisibilityDist) {
+      if (checkBackwards(x, y, dir.first)) {
+        float blockSlope = calcSlope(dir.second, primaryDist - 0.5, secondaryDist + visibilityDist - 0.5);
+        if (smallerSlope(dir.first, slope, blockSlope)) {
+          slope = blockSlope;
+        }
+        marchOverSame = false;
+      }
+    }
+    if (!onVisibleSide(dir.second, primaryDist, visibilityDist + secondaryDist, slope)) {
       gScore_(x, y) = evaluateDistance(x, y, x_, y_);
       cameFrom_(x, y) = startPoint_;
     } 
@@ -96,7 +105,7 @@ void Solver::march_to_slope(cardir dir, int& x, int& y, const int& primaryDist, 
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-int Solver::advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primaryDist, int& secondaryDist, float& primarySlope, bool& onFirstPrimary) {
+int Solver::advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primaryDist, int& secondaryDist, float& primarySlope, float& stopSlope, bool& onFirstPrimary) {
   // check if the start is next to an object
   bool prevInObject = checkBackwards(x, y, dir.second);
   float blockSlope;
@@ -114,6 +123,14 @@ int Solver::advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primary
   }
   // march in secondary direction untill you are past the slope or out of bounds
   while (!onVisibleSide(dir.second, primaryDist, secondaryDist, primarySlope, false)) {
+    // if marched on secondary past the stop slope -> return invalid path
+    if (onVisibleSide(dir.second, primaryDist, secondaryDist, stopSlope, false)) {
+      if (sharedConfig_->debugCardinalSearch) {
+        std::cout << "  -> stoped primary advance because it crossed the blockslope at (" << x << ", " << ny_-1-y << ")\n";
+      }
+      return 2;
+    }
+    // if marched in an object
     if (sharedOccupancyField_->get(x, y)) {
       prevInObject = true;
       blockSlope = calcSlope(dir.second, primaryDist - 0.5, secondaryDist + 0.5);
@@ -124,10 +141,18 @@ int Solver::advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primary
     else {
       if (prevInObject && !onFirstPrimary) {
         if (reverse(x, y, dir.first)) {
-          if (sharedConfig_->debugCardinalSearch) {
+          if (checkValidPathFront(dir.first, dir.second, x, y, secondaryDist, primarySlope, stopSlope, {x_, y_})) {
+            if (sharedConfig_->debugCardinalSearch) {
             std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): object touching slope\n";
+            }
+            openSet_->push(Node{6, evaluateDistance(x_, y_, x, y), x, y, dir.second, dir.first, 0, 0, primarySlope, false});
           }
-          openSet_->push(Node{6, evaluateDistance(x_, y_, x, y), x, y, dir.second, dir.first, 0, 0, primarySlope, false});
+          else {
+            if (sharedConfig_->debugCardinalSearch) {
+            std::cout << "  -> created a pivot with stopslope at (" << x << ", " << ny_-1-y << "): object touching slope\n";
+            }
+            openSet_->push(Node{6, evaluateDistance(x_, y_, x, y), x, y, dir.second, dir.first, 0, 0, stopSlope, false});
+          }
         }
         forceMove(x, y, dir.first);
       }
@@ -193,15 +218,17 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
     openSet_->push(Node{6, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, pivotSlope, false});
     return;
   }
-  //if large visibilityDiff, add only lowest possible pivot
+  //if large visibilityDiff, add first with pivot slope and rest with zero slope
   Node pivot;
+  bool usedPivotSlope = false;
   int march_dist = 0;
-  if (checkBackwards(x, y, dir.first)) {
+  if (checkBackwards(x, y, dir.first) || checkForwards(x, y, dir.first, dir.second, -1, 1)) {
     if (sharedConfig_->debugPivotCreation) {
       std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): object next to start\n";
     }
     // create pivot with same direction
-    pivot = Node{6, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, pivotSlope, false};
+    openSet_->push(Node{6, evaluateDistance(x_, y_, x, y), x, y, dir.first, dir.second, 0, 0, pivotSlope, false});
+    usedPivotSlope = true;
   }
   // else marchover location is beyond the object -> march back to the object
   else {
@@ -213,29 +240,26 @@ void Solver::processMarchOver(searchdir dir, int& x, int& y, const float slope, 
       std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): object after marchdown\n";
     }
     // create pivot with direction ortogonal to current
-    pivot = Node{6, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -pivotSlope, false};
+    openSet_->push(Node{6, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, (usedPivotSlope ? 0: -pivotSlope), false});
+    usedPivotSlope = true;
   }
   // if the march is not at the previous visibility -> their could be a gap 
+  bool foundGap = false;
   for (march_dist; march_dist < visibilityDiff-1; march_dist++) {
-    bool foundGap = false;
     if (!foundGap && !checkBackwards(x, y, dir.first, dir.second)) {
       foundGap = true;
     }
-    else if (foundGap && checkForwards(x, y, dir.first, dir.second)) {
+    else if (foundGap && checkBackwards(x, y, dir.first, dir.second)) {
       if (sharedConfig_->debugPivotCreation) {
         std::cout << "  -> created a pivot at (" << x << ", " << ny_-1-y << "): gap pivot\n";
       }
       // create pivot with direction ortogonal to current
-      pivot = Node{6, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, -pivotSlope, false};
-      foundGap = false; 
+      openSet_->push(Node{6, evaluateDistance(x_, y_, x, y), x, y, dir.second, oppDirection(dir.first), 0, 0, (usedPivotSlope ? 0: -pivotSlope), false});
+      foundGap = false;
+      usedPivotSlope = true;
     }
     forceMove(x, y, dir.second, -1);
   }
-  // push the last found node
-  if (sharedConfig_->debugPivotCreation) {
-    std::cout << "  -> pushed the pivot at (" << pivot.x << ", " << ny_-1-pivot.y << ")\n";
-  }
-  openSet_->push(pivot);
 }
 /*****************************************************************************/
 /*****************************************************************************/
@@ -322,7 +346,7 @@ void Solver::ComputeDistanceFromCarindal(searchdir dir, const int basePrimaryVis
     // march over secondary direction
     int x_sec = x_pri;
     int y_sec = y_pri;
-    march_to_slope(dir.second, x_sec, y_sec, primaryDist, 0, blockSlope, visibilityDist, marchOver, outOfBound);
+    march_to_slope(dir, x_sec, y_sec, primaryDist, 0, blockSlope, visibilityDist, prevVisibilityDist, marchOver, outOfBound, marchOverSame);
 // Process result of the march over secondary direction
   // ------- marchOver: new line of sight --------
     if (marchOver && !marchOverSame) {
@@ -330,7 +354,9 @@ void Solver::ComputeDistanceFromCarindal(searchdir dir, const int basePrimaryVis
       processMarchOver(dir, x_sec, y_sec, blockSlope, visibilityDist-prevVisibilityDist);
     }   
   // ------ marchOver: same line of sight --------
-    else if (marchOver && marchOverSame) {}
+    else if (marchOver && marchOverSame) {
+
+    }
   // ------ line of sight not reached --------
     // visibility increased while not marching over line of of sight
     else if (!marchOverSame && prevVisibilityDist < visibilityDist) {
@@ -456,7 +482,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
   // effectively march over first direction
   int x_sec = x_pri;
   int y_sec = y_pri;
-  march_to_slope(dir.second, x_sec, y_sec, primaryDist, secondaryDist, blockSlope, visibilityDist, marchOverBlock, outOfBound);
+  march_to_slope(dir, x_sec, y_sec, primaryDist, secondaryDist, blockSlope, visibilityDist, prevVisibilityDist-secondaryDist, marchOverBlock, outOfBound, marchOverSame);
 
   if (marchOverBlock) {
     // object right below the jump line
@@ -497,7 +523,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
   bool onFirstPrimary = true;
   while (true) {
   //-----------------advance primary direction------------------------
-    int advanceResult = advancePrimaryVisibility(dir, x_pri, y_pri, primaryDist, secondaryDist, startSlope, onFirstPrimary); 
+    int advanceResult = advancePrimaryVisibility(dir, x_pri, y_pri, primaryDist, secondaryDist, startSlope, blockSlope, onFirstPrimary); 
     // successful primary march
     if (advanceResult == 0) {
       gScore_(x_pri,y_pri) = evaluateDistance(x_pri,y_pri,x_,y_);
@@ -512,7 +538,7 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
   //-----------------advance secondary directon------------------------
     x_sec = x_pri;
     y_sec = y_pri;
-    march_to_slope(dir.second, x_sec, y_sec, primaryDist, secondaryDist, blockSlope, visibilityDist, marchOverBlock, outOfBound);
+    march_to_slope(dir, x_sec, y_sec, primaryDist, secondaryDist, blockSlope, visibilityDist, prevVisibilityDist-secondaryDist, marchOverBlock, outOfBound, marchOverSame);
     
   // __marchOver: new line of sight__
     if (marchOverBlock && !marchOverSame) {

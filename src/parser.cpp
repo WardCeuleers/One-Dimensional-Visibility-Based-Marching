@@ -186,14 +186,6 @@ bool ConfigParser::parse(const std::string &filename) {
         std::cerr << "It must be a boolean\n";
         return false;
       }
-    } else if (key == "marchStepSize") {
-      try {
-        config_.marchStepSize = std::stoi(value);
-      } catch (...) {
-        std::cerr << "Invalid value for " << key << ": " << value << '\n';
-        std::cerr << "It must be a positive integer\n";
-        return false;
-      }
     } else if (key == "objectList") {
       config_.objectList = parseVectorString(value);
     } else if (key == "timer") {

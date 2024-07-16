@@ -24,7 +24,7 @@ Solver::Solver(Environment &env)
 
   // copy the relavant marchControl parameters
   max_nb_of_iter_ = sharedConfig_->max_nb_of_iterations;
-  marchStepSize_ = sharedConfig_->marchStepSize;
+  marchStepSize_ = 1;
   colorPivots_ = sharedConfig_->colorPivots;
   colorBoundaries_ = sharedConfig_->colorBoundaries;
   colorCameFrom_ = sharedConfig_->colorCameFrom;
@@ -165,23 +165,25 @@ void Solver::visibilityBasedSolver() {
       }
       // pivot slope primary
       else if (curNode.type == 2) {
-        addNextSlopePrimary(curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state, false);
-        if (curNode.state) {
-          curNode.state = true;
-          if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
-            curNode.type = 0;
-            openSet_->push(curNode);
+        if (addNextSlopePrimary(curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state, false)) {
+          if (curNode.state) {
+            curNode.state = true;
+            if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
+              curNode.type = 0;
+              openSet_->push(curNode);
+            }
           }
         }
       }
       // parent slope primary
       else {
-        addNextSlopePrimary(curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state, true);
-        if (curNode.state) {
-          curNode.state = false;
-          if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
-            curNode.type = 0;
-            openSet_->push(curNode);
+        if (addNextSlopePrimary(curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state, true)) {
+          if (curNode.state) {
+            curNode.state = false;
+            if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
+              curNode.type = 0;
+              openSet_->push(curNode);
+            }
           }
         }
       }
