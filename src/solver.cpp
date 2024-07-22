@@ -166,24 +166,20 @@ void Solver::visibilityBasedSolver() {
       // pivot slope primary
       else if (curNode.type == 2) {
         if (addNextSlopePrimary(curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state, false)) {
-          if (curNode.state) {
-            curNode.state = true;
-            if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
-              curNode.type = 0;
-              openSet_->push(curNode);
-            }
+          curNode.state = true;
+          if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
+            curNode.type = 0;
+            openSet_->push(curNode);
           }
         }
       }
       // parent slope primary
       else {
         if (addNextSlopePrimary(curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state, true)) {
-          if (curNode.state) {
-            curNode.state = false;
-            if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
-              curNode.type = 0;
-              openSet_->push(curNode);
-            }
+          curNode.state = false;
+          if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
+            curNode.type = 0;
+            openSet_->push(curNode);
           }
         }
       }
@@ -198,7 +194,7 @@ void Solver::visibilityBasedSolver() {
     else if (curNode.type == 5) {
       if (addNextSwitchedPrimary(curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.state)) {
         curNode.state = false;
-        if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state)) {
+        if (advanceSecondaryNode(curNode.distance, curNode.x, curNode.y, curNode.primaryDir, curNode.secondaryDir, curNode.primaryDist, curNode.secondaryDist, curNode.slope, curNode.state, true, false)) {
           curNode.type = 0;
           openSet_->push(curNode);
         }
@@ -396,7 +392,7 @@ void Solver::saveVisibilityBasedSolverImage(const Field<double> &gScore) const {
     for (int i = 0; i < width; ++i) {
       for (int j = 0; j < height; ++j) {
         if (blockCorners_(i, j) != nullPoint_) {
-          sf::Color color = getColor(indexAt(blockCorners_(i, j).first, blockCorners_(i, j).second) / (1.0*nx_ * ny_));
+          sf::Color color = getColor(indexAt(blockCorners_(i, j).second, blockCorners_(i, j).first) / (1.0*nx_ * ny_));
           image.setPixel(i, j, color);
         }
       }

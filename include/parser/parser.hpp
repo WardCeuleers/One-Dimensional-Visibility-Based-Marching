@@ -33,8 +33,6 @@ struct Config {
   bool saveCameFrom = true;
   bool silent = false;
   bool debugCardinalSearch = false;
-  bool debugPivotCreation = false;
-  bool debugBoundary = false;
   bool debugPivotSearch = false;
   bool saveVisibilityBasedSolverImage = true;
   bool contourLines = true;

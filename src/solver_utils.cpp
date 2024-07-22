@@ -506,55 +506,29 @@ bool const Solver::checkBackwards(const int& x, const int& y, const cardir& dir_
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-bool const Solver::nextToSibling(const int& x, const int& y, const cardir& dir, const point& parent, bool reverse) {
-  if (reverse) {
-    switch (dir) {
-      case cardir::North: return (cameFrom_(x,y+1) == parent);
-      case cardir::East:  return (cameFrom_(x-1,y) == parent);
-      case cardir::South: return (cameFrom_(x,y-1) == parent);
-      case cardir::West:  return (cameFrom_(x+1,y) == parent);
-      default: 
-        std::cout << "Error: invalid direction in nextToSibling" << std::endl;
-        return false;
-    }
-  }
-  else {
-    switch (dir) {
-      case cardir::North: return (cameFrom_(x,y-1) == parent);
-      case cardir::East:  return (cameFrom_(x+1,y) == parent);
-      case cardir::South: return (cameFrom_(x,y+1) == parent);
-      case cardir::West:  return (cameFrom_(x-1,y) == parent);
-      default: 
-        std::cout << "Error: invalid direction in nextToSibling" << std::endl;
-        return false;
-    }
+bool const Solver::prevFromSibling(const int& x, const int& y, const cardir& dir, const point& parent) {
+  switch (dir) {
+    case cardir::North: return (cameFrom_(x,y+1) == parent || (cameFrom_(x,y+1) == nullPoint_ && !sharedOccupancyField_->get(x,y+1)));
+    case cardir::East:  return (cameFrom_(x-1,y) == parent || (cameFrom_(x-1,y) == nullPoint_ && !sharedOccupancyField_->get(x-1,y)));
+    case cardir::South: return (cameFrom_(x,y-1) == parent || (cameFrom_(x,y-1) == nullPoint_ && !sharedOccupancyField_->get(x,y-1)));
+    case cardir::West:  return (cameFrom_(x+1,y) == parent || (cameFrom_(x+1,y) == nullPoint_ && !sharedOccupancyField_->get(x+1,y)));
+    default: 
+      std::cout << "Error: invalid direction in nextToSibling" << std::endl;
+      return false;
   }
 }
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-Solver::point Solver::getNeighbour(const int& x, const int& y, const cardir& dir, bool reverse) {
-  if (reverse) {
-    switch (dir) {
-      case cardir::North: return {x, y+1};
-      case cardir::East:  return {x-1, y};
-      case cardir::South: return {x, y-1};
-      case cardir::West:  return {x+1, y};
-      default: 
-        std::cout << "Error: invalid direction in getNeighbour" << std::endl;
-        return {x, y};
-    }
-  }
-  else {
-    switch (dir) {
-      case cardir::North: return {x, y-1};
-      case cardir::East:  return {x+1, y};
-      case cardir::South: return {x, y+1};
-      case cardir::West:  return {x-1, y};
-      default: 
-        std::cout << "Error: invalid direction in getNeighbour" << std::endl;
-        return {x, y};
-    }
+Solver::point Solver::getPrevPoint(const int& x, const int& y, const cardir& dir) {
+  switch (dir) {
+    case cardir::North: return {x, y+1};
+    case cardir::East:  return {x-1, y};
+    case cardir::South: return {x, y-1};
+    case cardir::West:  return {x+1, y};
+    default: 
+      std::cout << "Error: invalid direction in getPrevPoint" << std::endl;
+      return {x, y};
   }
 }
 /*****************************************************************************/
@@ -709,7 +683,7 @@ bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondar
       if (startVisibleDist > primParentPivotDist + distanceToEdge(primaryDir, pivot.first, pivot.second))
         return true;
       // check startVisibleDist is larger then distance to first visble point on next secondary axis
-      return (startVisibleDist - primParentPivotDist >= ceil((secondaryDist + 1)*blockSlope));
+      return (startVisibleDist - primParentPivotDist > ceil((secondaryDist + 1)*blockSlope));
     case cardir::East:
     case cardir::West:
       secondaryDist = floor(primaryDist*blockSlope);
@@ -720,7 +694,7 @@ bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondar
       if (startVisibleDist > primParentPivotDist + distanceToEdge(primaryDir, pivot.first, pivot.second))
         return true;
       // check for valid path between slopes
-      return (startVisibleDist - primParentPivotDist >= ceil((secondaryDist + 1)/blockSlope));
+      return (startVisibleDist - primParentPivotDist > ceil((secondaryDist + 1)/blockSlope));
     default:
       std::cout << "Invalid direction while checking for a Valid MarchOver Path\n";
       return false;
@@ -730,7 +704,7 @@ bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondar
 /*****************************************************************************/
 /*****************************************************************************/
 bool Solver::checkValidPathFront(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& secondaryDist, const float& blockSlope, const float& stopSlope, const point& pivot) {
-  if (stopSlope == 0) {return true;}
+  if (stopSlope == infinity) {return true;}
   int primaryDist;       // primary axis of the last visible point on the given secondary axis  
   int stopVisibleDist;  // secondary dist of the first visible point before the stop slope on the current primary axis
   switch (secondaryDir) {
@@ -744,7 +718,7 @@ bool Solver::checkValidPathFront(const cardir& primaryDir, const cardir& seconda
       if (stopVisibleDist > distanceToEdge(secondaryDir, pivot.first, pivot.second))
         return true;
       // check startVisibleDist is larger then distance to first visble point on next secondary axis
-      return (stopVisibleDist >= ceil((primaryDist + 1)/blockSlope));
+      return (stopVisibleDist > ceil((primaryDist + 1)/blockSlope));
     case cardir::East:
     case cardir::West:
       primaryDist = floor(secondaryDist/blockSlope);
@@ -755,7 +729,7 @@ bool Solver::checkValidPathFront(const cardir& primaryDir, const cardir& seconda
       if (stopVisibleDist > distanceToEdge(secondaryDir, pivot.first, pivot.second))
         return true;
       // check startVisibleDist is larger then distance to first visble point on next secondary axis
-      return (stopVisibleDist >= ceil((primaryDist + 1)*blockSlope));
+      return (stopVisibleDist > ceil((primaryDist + 1)*blockSlope));
     default:
       std::cout << "Invalid direction while checking for a Valid path front\n";
       return false;

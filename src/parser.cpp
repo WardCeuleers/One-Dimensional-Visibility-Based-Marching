@@ -276,26 +276,6 @@ bool ConfigParser::parse(const std::string &filename) {
         std::cerr << "It must be a boolean\n";
         return false;
       }
-    } else if (key == "debugPivotCreation") {
-      if (value == "0" || value == "false") {
-        config_.debugPivotCreation = false;
-      } else if (value == "1" || value == "true") {
-        config_.debugPivotCreation = true;
-      } else {
-        std::cerr << "Invalid value for " << key << ": " << value << '\n';
-        std::cerr << "It must be a boolean\n";
-        return false;
-      }
-    } else if (key == "debugBoundary") {
-      if (value == "0" || value == "false") {
-        config_.debugBoundary = false;
-      } else if (value == "1" || value == "true") {
-        config_.debugBoundary = true;
-      } else {
-        std::cerr << "Invalid value for " << key << ": " << value << '\n';
-        std::cerr << "It must be a boolean\n";
-        return false;
-      }
     } else if (key == "debugPivotSearch") {
       if (value == "0" || value == "false") {
         config_.debugPivotSearch = false;
