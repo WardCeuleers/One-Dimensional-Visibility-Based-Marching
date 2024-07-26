@@ -116,18 +116,18 @@ int const Solver::distanceToEdge(const cardir& dir, const int& x, const int& y) 
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-bool const Solver::onVisibleSide(const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist, const float& slope, bool SlopeOfParent) {
+bool const Solver::onVisibleSide(const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist, const float& slope, bool slopeFromParent) {
   if (slope == 0) {return secondaryDist > 0;}
   switch(secondaryDir) {
     case cardir::North:
     case cardir::South:
-      if (SlopeOfParent)
+      if (slopeFromParent)
         return primaryDist < secondaryDist*(double)slope;
       else 
         return primaryDist <= secondaryDist*(double)slope;
     case cardir::East:
     case cardir::West:
-      if (SlopeOfParent) 
+      if (slopeFromParent) 
         return primaryDist*(double)slope < secondaryDist;
       else
         return primaryDist*(double)slope <= secondaryDist;
