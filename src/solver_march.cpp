@@ -358,23 +358,8 @@ bool Solver::advanceSecondaryNode(double& distance, int& x, int& y, const cardir
     point blockSource = blockCorners_(nextblock);
     // Check if the cell was no a boundary after the move
     bool movedOnBoundary = false;
-    bool movedOnAdaptedBoundary = false;
-    if (nextblock != nullPoint_) {
-      // if the boundary is coming from the pivot
-      if (blockSource == pivot)
+    if (nextblock != nullPoint_ && blockSource == pivot) {
         movedOnBoundary = true;
-      // if the boundary source is another corner
-      else if (sharedOccupancyField_->get(blockSource.first, blockSource.second)) {
-        movedOnAdaptedBoundary = true;
-        if (moveBoundary && evaluateCardinalDistance(primaryDir, nextblock, {x, y}) == 1) {
-          forceMove(x, y, secondaryDir, -1);
-          if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
-            std::cout << " -> added a node to create a pivot at " << x << ", " << ny_-1-y << std::endl;
-          }
-          openSet_->push(Node{6, distance, x, y, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, false});
-          forceMove(x, y, secondaryDir);
-        }
-      }
     }
     // effectivly move the boundary if moveboundary is true and the new point does not have a boundary from another search
     if (moveBoundary && nextblock == nullPoint_) {
@@ -383,10 +368,6 @@ bool Solver::advanceSecondaryNode(double& distance, int& x, int& y, const cardir
     if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
       std::cout << "  - moveBoundary: " << (moveBoundary ? "TRUE":"FALSE") << std::endl;
       std::cout << "  - movedOnBoundary: " << (movedOnBoundary ? "TRUE":"FALSE") << std::endl;
-      std::cout << "  - movedOnAdaptedBoundary: " << (movedOnAdaptedBoundary ? "TRUE":"FALSE") << std::endl;
-    }
-    if (movedOnAdaptedBoundary) {
-      std::cout << " ~~~~~~> moved on adapted slope at: " << pivot.first << ", " << ny_-1-pivot.second << std::endl;
     }
     // process boundary point if on boundary
     //------------------------------------------------------------------------------------------------------
@@ -397,12 +378,6 @@ bool Solver::advanceSecondaryNode(double& distance, int& x, int& y, const cardir
     }
     else if (movedOnBoundary) {
       if (!processBoundaryPoint(x, y, distance, pivot, primaryDir, secondaryDir, primaryDist, secondaryDist, slope, calcBlockSlope(primaryDir, secondaryDir, pivot, nextblock), nextblock, fromPivotSlope, false)) {
-        return false;
-      }
-      moveBoundary = true;
-    }
-    else if (movedOnAdaptedBoundary) {
-      if (!processBoundaryPoint(x, y, distance, pivot, primaryDir, secondaryDir, primaryDist, secondaryDist, calcBlockSlope(primaryDir, secondaryDir, blockCorners_(blockSource), blockSource), calcBlockSlope(primaryDir, secondaryDir, pivot, nextblock), nextblock, fromPivotSlope, true)) {
         return false;
       }
       moveBoundary = true;
