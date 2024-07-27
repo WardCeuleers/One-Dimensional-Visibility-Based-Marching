@@ -82,6 +82,10 @@ void Environment::generateNewEnvironmentFromSettings() {
     for (int j = col_1; j < col_2; ++j) {
       for (int k = row_1; k < row_2; ++k) {
         sharedOccupancyField_->set(j, k, 1);
+        if (sharedConfig_->vbm) {
+          sharedVisibilityField_->set(j, k, 0.0);
+          sharedSpeedField_->set(j, k, speedValue_);
+        }
       }
     }
   }
@@ -107,6 +111,10 @@ void Environment::generateCustomEnvironmentFromSettings() {
     for (int j = col_1; j < col_2; ++j) {
       for (int k = row_1; k < row_2; ++k) {
         sharedOccupancyField_->set(j, k, 1);
+        if (sharedConfig_->vbm) {
+          sharedVisibilityField_->set(j, k, 0.0);
+          sharedSpeedField_->set(j, k, speedValue_);
+        }
       }
     }
   }
@@ -136,7 +144,21 @@ void Environment::loadMaps(const std::string &filename) {
 
   for (size_t i = 0; i < nx_; ++i) {
     for (size_t j = 0; j < ny_; ++j) {
-      sharedOccupancyField_->set(i, j, visibilityField[i][j]);
+      // set occupancy field
+      if (visibilityField[i][j] >= 0.5) {
+        sharedOccupancyField_->set(i, j, 0);
+      } else {
+        sharedOccupancyField_->set(i, j, 1);
+      }
+      // set visibility and speed field for vbm
+      if (sharedConfig_->vbm) {
+        sharedVisibilityField_->set(i, j, visibilityField[i][j]);
+        if (visibilityField[i][j] == 1.0) {
+          sharedSpeedField_->set(i, j, 1.0);
+        } else {
+          sharedSpeedField_->set(i, j, speedValue_);
+        }
+      }
     }
   }
   std::cout << "Loaded image of dimensions " << nx_ << "x" << ny_
@@ -173,17 +195,25 @@ bool Environment::loadImage(const std::string &filename) {
 
     resetEnvironment();
 
-    sf::Color color;
+    sf::Color pixel;
     int gray;
     // Access the pixel data of the image
     for (size_t x = 0; x < nx_; ++x) {
       for (size_t y = 0; y < ny_; ++y) {
-        color = uniqueLoadedImage_->getPixel(x, y);
-        gray = color.r;
-        if (gray == 255) {
-          sharedOccupancyField_->set(x, y, 1);
-        } else {
+        pixel = uniqueLoadedImage_->getPixel(x, y);
+        const int gray = 0.3 * pixel.r + 0.59 * pixel.g + 0.11 * pixel.b;
+        if (gray > 128) {
           sharedOccupancyField_->set(x, y, 0);
+          if (sharedConfig_->vbm) {
+            sharedVisibilityField_->set(x, y, 1.0);
+            sharedSpeedField_->set(x, y, 1.0);
+          }
+        } else {
+          sharedOccupancyField_->set(x, y, 1);
+          if (sharedConfig_->vbm) {
+            sharedVisibilityField_->set(x, y, 0);
+            sharedSpeedField_->set(x, y, speedValue_);
+          }
         }
       }
     }
@@ -198,6 +228,10 @@ bool Environment::loadImage(const std::string &filename) {
 /*****************************************************************************/
 void Environment::resetEnvironment() {
   sharedOccupancyField_ = std::make_unique<Field<int>>(nx_, ny_, 0);
+  if (sharedConfig_->vbm) {
+    sharedVisibilityField_ = std::make_unique<Field<double>>(nx_, ny_, 1.0);
+    sharedSpeedField_ = std::make_unique<Field<double>>(nx_, ny_, 1.0);
+  }
 }
 
 /*****************************************************************************/
@@ -205,7 +239,7 @@ void Environment::resetEnvironment() {
 /*****************************************************************************/
 void Environment::saveEnvironment() {
   // Define the path to the output file
-  std::string outputFilePath = "./output/environment.txt";
+  std::string outputFilePath = "./output/occupancyField.txt";
   // Check if the directory exists, and create it if it doesn't
   namespace fs = std::filesystem;
   fs::path directory = fs::path(outputFilePath).parent_path();
@@ -217,8 +251,8 @@ void Environment::saveEnvironment() {
     }
   }
 
-  // save Environment
-  if (sharedConfig_->saveResults && sharedConfig_->saveEnvironment) {
+  // save Occupancy Field
+  if (sharedConfig_->saveResults && sharedConfig_->saveOccupancyField) {
     std::fstream of(outputFilePath, std::ios::out | std::ios::trunc);
     if (!of.is_open()) {
       std::cerr << "Failed to open output file " << outputFilePath << std::endl;
@@ -234,6 +268,52 @@ void Environment::saveEnvironment() {
     of.close();
         if (!sharedConfig_->silent) {
       std::cout << "Saved visibility field" << std::endl;
+    }
+  } else {
+    if (fs::exists(outputFilePath))
+      fs::remove(outputFilePath);
+  }
+  // save Visibility Field
+  outputFilePath = "./output/visibilityField.txt";
+  if (sharedConfig_->vbm && sharedConfig_->saveResults && sharedConfig_->saveVisibilityField) {
+    std::fstream of(outputFilePath, std::ios::out | std::ios::trunc);
+    if (!of.is_open()) {
+      std::cerr << "Failed to open output file " << outputFilePath << std::endl;
+      return;
+    }
+    std::ostream &os = of;
+    for (int j = ny_ - 1; j >= 0; --j) {
+      for (size_t i = 0; i < nx_; ++i) {
+        os << sharedVisibilityField_->get(i, j) << " ";
+      }
+      os << "\n";
+    }
+    of.close();
+    if (!sharedConfig_->silent) {
+      std::cout << "Saved visibility field" << std::endl;
+    }
+  } else {
+    if (fs::exists(outputFilePath))
+      fs::remove(outputFilePath);
+  }
+  // save Speed Field
+  outputFilePath = "./output/speedField.txt";
+  if (sharedConfig_->vbm && sharedConfig_->saveResults && sharedConfig_->saveVisibilityField) {
+    std::fstream of(outputFilePath, std::ios::out | std::ios::trunc);
+    if (!of.is_open()) {
+      std::cerr << "Failed to open output file " << outputFilePath << std::endl;
+      return;
+    }
+    std::ostream &os = of;
+    for (int j = ny_ - 1; j >= 0; --j) {
+      for (size_t i = 0; i < nx_; ++i) {
+        os << sharedSpeedField_->get(i, j) << " ";
+      }
+      os << "\n";
+    }
+    of.close();
+    if (!sharedConfig_->silent) {
+      std::cout << "Saved speed field" << std::endl;
     }
   } else {
     if (fs::exists(outputFilePath))

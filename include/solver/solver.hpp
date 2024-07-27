@@ -51,8 +51,7 @@ public:
   void setMaxIter();
 private:
   void reset();
-  void saveResults(const std::vector<point> &path,
-                   const std::string &methodName) const;
+  void saveResults(const std::vector<point> &path) const;
   void saveVisibilityBasedSolverImage(const Field<double> &gScore) const;
 
   std::shared_ptr<Field<int>> sharedOccupancyField_;
@@ -61,7 +60,7 @@ private:
   Field<point> cameFrom_;      // Parent coordinates
   Field<searchdir> pivotDir_;  // Pivot search direction
   Field<size_t> slopeOrigin_;  // Index of the origin of the slope
-  Field<point> blockCorners_;  // Reference to corner blocking line of sight between parent & child
+  Field<std::pair<size_t, size_t>> blockCorners_;  // Reference to corner blocking line of sight between parent & child
 
   std::shared_ptr<Config> sharedConfig_;
   std::unique_ptr<point[]> pivots_;
@@ -99,7 +98,7 @@ private:
 
   // ========= inline functions ==================================================================================
 
-  inline int indexAt(const int x, const int y) const {
+  inline size_t indexAt(const int x, const int y) const {
     return x + y * nx_;
   };
   inline point coordinatesAt(const int index) const {
@@ -144,8 +143,12 @@ private:
   point getPrevPoint(const int& x, const int& y, const cardir& dir);
   point getPivot(const int& x, const int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist);
   float const calcSlope(const cardir& secondaryDir, const float& primaryDist, const float& secondaryDist);
+  bool  const smallerSlope(const cardir& primaryDir, const float& oldSlope, const float& newSlope);
   float const calcBlockSlope(const cardir& primaryDir, const cardir& secondaryDir, const point& parent, const point& block);
-  bool const smallerSlope(const cardir& primaryDir, const float& oldSlope, const float& newSlope);
+  point getBlockCorner(const int& x, const int& y, const cardir& secondaryDir);
+  point getBlockCorner(const point& block, const cardir& secondaryDir);
+  void setBlockCorner(const int& x, const int& y, const cardir& secondaryDir, const point& block);
+  void resetBlockCorner(const int& x, const int& y, const cardir& secondaryDir);
   bool checkValidPathBack(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& primaryDist, const float& startSlope, const float& blockSlope, const point& pivot);
   bool checkValidPathBack(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& primaryDist, const float& startSlope, const float& blockSlope, const point& pivot, const point& slopeParent);
   bool checkValidPathFront(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& primaryDist, const float& startSlope, const float& blockSlope, const point& pivot);

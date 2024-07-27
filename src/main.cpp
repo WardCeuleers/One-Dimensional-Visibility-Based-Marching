@@ -5,6 +5,7 @@
 
 #include "environment/environment.hpp"
 #include "solver/solver.hpp"
+#include "solver/VBM_solver.hpp"
 
 /*****************************************************************************/
 /*****************************************************************************/
@@ -131,16 +132,21 @@ int main() {
 
   vbd::Environment env = vbd::Environment(config);
 
-  vbd::Solver sol = vbd::Solver(env);
+  if (config.vbm) {
+    vbd::VBM_Solver VBM_sol = vbd::VBM_Solver(env);
+    VBM_sol.visibilityBasedSolver();
+  }
+
+  vbd::Solver VBD_sol = vbd::Solver(env);
   if (!config.marchControl) {
-    sol.visibilityBasedSolver();
+    VBD_sol.visibilityBasedSolver();
   }
   else {
     int ch;
     bool running = true;
     while (running) {
       // calculate current solution
-      sol.visibilityBasedSolver();
+      VBD_sol.visibilityBasedSolver();
       // initialize ncurses
       initscr();
       cbreak();
@@ -153,39 +159,39 @@ int main() {
         ch = getch();  
         switch (ch) {
           case KEY_RIGHT:
-            sol.increaseMaxIter();
+            VBD_sol.increaseMaxIter();
             reading = false;
             break;
           case KEY_LEFT:
-            sol.decreaseMaxIter();
+            VBD_sol.decreaseMaxIter();
             reading = false;
             break;
           case 'p':
-            sol.togglePivots();
+            VBD_sol.togglePivots();
             reading = false;
             break;
           case 'b':
-            sol.toggleBoundaries();
+            VBD_sol.toggleBoundaries();
             reading = false;
             break;
           case 'c':
-            sol.toggleContourLines();
+            VBD_sol.toggleContourLines();
             reading = false;
             break;
           case 'o':
-            sol.toggleCameFrom();
+            VBD_sol.toggleCameFrom();
             reading = false;
             break;
           case 's':
-            sol.changeMarchStepSize();
+            VBD_sol.changeMarchStepSize();
             reading = false;
             break;
           case 't':
-            sol.setTarget();
+            VBD_sol.setTarget();
             reading = false;
             break;
           case 'i':
-            sol.setMaxIter();
+            VBD_sol.setMaxIter();
             reading = false;
             break;
           case 'q':  // Press 'q' to exit the loop

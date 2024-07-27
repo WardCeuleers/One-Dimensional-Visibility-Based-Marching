@@ -50,6 +50,14 @@ public:
   // Deconstructor
   ~Environment() = default;
 
+  // VBM
+  // Get visibility field shared pointer.
+  inline const auto &getVisibilityField() const {
+    return sharedVisibilityField_;
+  };
+  // Get speed field shared pointer.
+  inline const auto &getSpeedField() const { return sharedSpeedField_; };
+
 private:
   size_t ny_;
   size_t nx_;
@@ -65,6 +73,13 @@ private:
 
   void saveEnvironment();
   void resetEnvironment();
+
+  // VBM
+   double speedValue_ = 2.0;
+  // Shared pointer to a Field object of type double that has map occupancy
+  // values.
+  std::shared_ptr<Field<double>> sharedVisibilityField_;
+  std::shared_ptr<Field<double>> sharedSpeedField_;
 };
 
 } // namespace vbd

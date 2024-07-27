@@ -56,22 +56,22 @@ void Solver::reset() {
   x_ = sharedConfig_->pos_x;
   y_ = ny_ - 1 - sharedConfig_->pos_y;
   startPoint_ = point(x_, y_);
-  nullPoint_ = point(nx_+1, ny_+1);
-  nullidx_ = nx_ * ny_;
+  nullPoint_ = point(0, ny_+1);
+  nullidx_ = indexAt(0, ny_+1);
   endPoint_ = nullPoint_;
   // reset the fields
   gScore_.reset(nx_, ny_, infinity);
   cameFrom_.reset(nx_, ny_, nullPoint_);
   pivotDir_.reset(nx_, ny_, {cardir::None, cardir::None});
   slopeOrigin_.reset(nx_, ny_, nullidx_);
-  blockCorners_.reset(nx_, ny_, nullPoint_);
+  blockCorners_.reset(nx_, ny_, std::pair(nullidx_, nullidx_));
 
   openSet_.reset();
   pivots_.reset(new point[nx_ * ny_]);
 
   // Reserve heaps
   std::vector<Node> container;
-  container.reserve(nx_ * ny_);
+  container.reserve(nx_ * ny_ / 2);
   std::priority_queue<Node, std::vector<Node>, std::less<Node>> heap(
       std::less<Node>(), std::move(container));
   openSet_ = std::make_unique<std::priority_queue<Node>>(heap);
@@ -89,7 +89,7 @@ void Solver::reset() {
 /*****************************************************************************/
 void Solver::visibilityBasedSolver() {
   if (!sharedConfig_->silent) {
-        std::cout << "###################### Visibility-based solver output "
+        std::cout << "###################### VBD solver output "
                  "######################"
               << std::endl;
   }
@@ -227,7 +227,7 @@ void Solver::visibilityBasedSolver() {
     saveVisibilityBasedSolverImage(gScore_);
   }
   if (sharedConfig_->saveResults) {
-    saveResults({}, "visibilityBased");
+    saveResults({});
   }
 }
 /*****************************************************************************/
@@ -391,8 +391,13 @@ void Solver::saveVisibilityBasedSolverImage(const Field<double> &gScore) const {
   if (colorBoundaries_) {
     for (int i = 0; i < width; ++i) {
       for (int j = 0; j < height; ++j) {
-        if (blockCorners_(i, j) != nullPoint_) {
-          sf::Color color = getColor(indexAt(blockCorners_(i, j).second, blockCorners_(i, j).first) / (1.0*nx_ * ny_));
+        std::pair<size_t, size_t> blockPair = blockCorners_(i, j);
+        if (blockPair.first != nullidx_) {
+          sf::Color color = getColor(blockPair.first / (1.0*nx_ * ny_));
+          image.setPixel(i, j, color);
+        }
+        else if (blockPair.second != nullidx_) {
+          sf::Color color = getColor(blockPair.second / (1.0*nx_ * ny_));
           image.setPixel(i, j, color);
         }
       }
@@ -406,16 +411,16 @@ void Solver::saveVisibilityBasedSolverImage(const Field<double> &gScore) const {
   if (!sharedConfig_->silent) {
     std::cout << "Saving visibility-based solver image" << std::endl;
   }
-  std::string outputPath = "./output/visibilityBasedSolver.png";
+  std::string outputPath = "./output/VBD_solver.png";
   image.saveToFile(outputPath);
 }
 
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-void Solver::saveResults(const std::vector<point> &resultingPath,
-                         const std::string &methodName) const {
+void Solver::saveResults(const std::vector<point> &resultingPath) const {
   namespace fs = std::filesystem;
+  const std::string methodName = "VBD";
   // Define the path to the output file
   std::string outputFilePath = "./output/" + methodName + ".txt";
 
@@ -430,8 +435,8 @@ void Solver::saveResults(const std::vector<point> &resultingPath,
   }
 
   // Save gScore_
+  outputFilePath = "./output/" + methodName + "_gScore.txt";
   if (sharedConfig_->savegScore) {
-    outputFilePath = "./output/" + methodName + "_gScore.txt";
     std::fstream of1(outputFilePath, std::ios::out | std::ios::trunc);
     if (!of1.is_open()) {
       std::cerr << "Failed to open output file " << outputFilePath << std::endl;
@@ -449,14 +454,13 @@ void Solver::saveResults(const std::vector<point> &resultingPath,
       std::cout << "Saved " + methodName + " gScore" << std::endl;
     }
   } else {
-    outputFilePath = "./output/" + methodName + "_gScore.txt";
     if (fs::exists(outputFilePath))
       fs::remove(outputFilePath);
   }
 
   // Save Pivots
+  outputFilePath = "./output/" + methodName + "_pivots.txt";
   if (sharedConfig_->savePivots) {
-    outputFilePath = "./output/" + methodName + "_pivots.txt";
     std::fstream of3(outputFilePath, std::ios::out | std::ios::trunc);
     if (!of3.is_open()) {
       std::cerr << "Failed to open output file " << outputFilePath << std::endl;
@@ -464,21 +468,20 @@ void Solver::saveResults(const std::vector<point> &resultingPath,
     }
     std::ostream &os = of3;
     for (size_t i = 0; i < nb_of_pivots_; ++i) {
-      os << "(" << pivots_[i].first << " " << ny_ - 1 - pivots_[i].second << ") at distance " << gScore_(pivots_[i]);
-      os << "\n";
+      os << pivots_[i].first << " " << ny_ - 1 - pivots_[i].second << "\n";
     }
     of3.close();
     if (!sharedConfig_->silent) {
       std::cout << "Saved " + methodName + " pivots" << std::endl;
     }
   } else {
-    outputFilePath = "./output/" + methodName + "_pivots.txt";
     if (fs::exists(outputFilePath))
       fs::remove(outputFilePath);
   }
-// Save CameFrom
-  if (sharedConfig_->saveCameFrom) {
-    outputFilePath = "./output/" + methodName + "_cameFrom.txt";
+
+  // Save CameFrom
+  outputFilePath = "./output/" + methodName + "_cameFrom.txt";
+  if (sharedConfig_->saveCameFrom) { 
     std::fstream of1(outputFilePath, std::ios::out | std::ios::trunc);
     if (!of1.is_open()) {
       std::cerr << "Failed to open output file " << outputFilePath
@@ -488,10 +491,7 @@ void Solver::saveResults(const std::vector<point> &resultingPath,
     std::ostream &os1 = of1;
     for (int j = 0; j < ny_; ++j) {
       for (size_t i = 0; i < nx_; ++i) {
-        if (cameFrom_(i, j) != nullPoint_)
-          os1 << "(" << cameFrom_(i, j).first << ", " << ny_ - 1 - cameFrom_(i, j).second << ")";
-        else 
-          os1 << "( x , x )";
+        os1 << indexAt(cameFrom_(i, j).first, cameFrom_(i, j).second) << " ";
       }
       os1 << "\n";
     }
@@ -504,6 +504,8 @@ void Solver::saveResults(const std::vector<point> &resultingPath,
     if (fs::exists(outputFilePath))
       fs::remove(outputFilePath);
   }
-  return;
 }
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
 } // namespace vbd

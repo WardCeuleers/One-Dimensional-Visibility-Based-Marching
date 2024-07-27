@@ -24,10 +24,12 @@ struct Config {
   bool marchControl = false;
   int pos_x;
   int pos_y;
+  int target_x;
+  int target_y;
   bool timer = true;
   size_t max_nb_of_iterations = 1000;
   bool saveResults = true;
-  bool saveEnvironment = true;
+  bool saveOccupancyField = true;
   bool savegScore = true;
   bool savePivots = true;
   bool saveCameFrom = true;
@@ -41,6 +43,14 @@ struct Config {
   int pivotColorGridSize = 16;
   bool colorBoundaries = false;
   bool colorCameFrom = true;
+  bool msfm = false;
+  bool vbm = false;
+  // parameters for vbm
+  float speedValue = 2.0;
+  float visibilityThreshold = 0.5;
+  bool saveVisibilityField = true;
+  bool saveSpeedField = true;
+  int ballRadius = 5;
 };
 
 // Singleton parser classs

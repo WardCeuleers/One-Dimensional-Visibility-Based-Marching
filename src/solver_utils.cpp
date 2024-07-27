@@ -592,6 +592,22 @@ float const Solver::calcSlope(const cardir& secondaryDir, const float& primaryDi
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
+bool const Solver::smallerSlope(const cardir& primaryDir, const float& oldSlope, const float& newSlope) {
+  switch(primaryDir) {
+    case cardir::North:
+    case cardir::South:
+      return (newSlope < oldSlope);
+    case cardir::East:
+    case cardir::West:
+      return (newSlope > oldSlope);
+    default:
+      std::cout << "Error: invalid direction in smallerSlope" << std::endl;
+      return false;
+  }
+}
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
 float const Solver::calcBlockSlope(const cardir& primaryDir, const cardir& secondaryDir, const point& parent, const point& block) {
   switch (primaryDir) {
     case cardir::North:
@@ -646,17 +662,75 @@ float const Solver::calcBlockSlope(const cardir& primaryDir, const cardir& secon
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
-bool const Solver::smallerSlope(const cardir& primaryDir, const float& oldSlope, const float& newSlope) {
-  switch(primaryDir) {
+Solver::point Solver::getBlockCorner(const int& x, const int& y, const cardir& secondaryDir) {
+  size_t index;
+  switch (secondaryDir) {
     case cardir::North:
     case cardir::South:
-      return (newSlope < oldSlope);
+      index = blockCorners_(x, y).first;
+      return {index % nx_, (index) / nx_};
     case cardir::East:
     case cardir::West:
-      return (newSlope > oldSlope);
-    default:
-      std::cout << "Error: invalid direction in smallerSlope" << std::endl;
-      return false;
+      index = blockCorners_(x, y).second;
+      return {index % nx_, (index) / nx_};
+    default: 
+      std::cout << "Error: invalid direction in getBlockCorner" << std::endl;
+      break;
+  }
+  return {x, y};
+}
+/*****************************************************************************/
+Solver::point Solver::getBlockCorner(const point& block, const cardir& secondaryDir) {
+  size_t index;
+  switch (secondaryDir) {
+    case cardir::North:
+    case cardir::South:
+      index = blockCorners_(block.first, block.second).first;
+      return {index % nx_, (index) / nx_};
+    case cardir::East:
+    case cardir::West:
+      index = blockCorners_(block.first, block.second).second;
+      return {index % nx_, (index) / nx_};
+    default: 
+      std::cout << "Error: invalid direction in getBlockCorner" << std::endl;
+      break;
+  }
+  return block;
+}
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
+void Solver::setBlockCorner(const int& x, const int& y, const cardir& secondaryDir, const point& block) {
+  switch (secondaryDir) {
+    case cardir::North:
+    case cardir::South:
+      blockCorners_(x, y).first = block.first + block.second*nx_;
+      break;
+    case cardir::East:
+    case cardir::West:
+      blockCorners_(x, y).second = block.first + block.second*nx_;
+      break;
+    default: 
+      std::cout << "Error: invalid direction in setBlockCorner" << std::endl;
+      break;
+  }
+}
+/*****************************************************************************/
+/*****************************************************************************/
+/*****************************************************************************/
+void Solver::resetBlockCorner(const int& x, const int& y, const cardir& secondaryDir) {
+  switch (secondaryDir) {
+    case cardir::North:
+    case cardir::South:
+      blockCorners_(x, y).first = nullidx_;
+      break;
+    case cardir::East:
+    case cardir::West:
+      blockCorners_(x, y).second = nullidx_;
+      break;
+    default: 
+      std::cout << "Error: invalid direction in resetBlockCorner" << std::endl;
+      break;
   }
 }
 /*****************************************************************************/

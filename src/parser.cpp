@@ -156,6 +156,22 @@ bool ConfigParser::parse(const std::string &filename) {
         std::cerr << "It must be a positive integer\n";
         return false;
       }
+    } else if (key == "target_x") {
+      try {
+        config_.target_x = std::stoi(value);
+      } catch (...) {
+        std::cerr << "Invalid value for " << key << ": " << value << '\n';
+        std::cerr << "It must be a positive integer\n";
+        return false;
+      }
+    } else if (key == "target_y") {
+      try {
+        config_.target_y = std::stoi(value);
+      } catch (...) {
+        std::cerr << "Invalid value for " << key << ": " << value << '\n';
+        std::cerr << "It must be a positive integer\n";
+        return false;
+      }
     } else if (key == "randomSeed") {
       if (value == "0" || value == "false") {
         config_.randomSeed = false;
@@ -208,11 +224,11 @@ bool ConfigParser::parse(const std::string &filename) {
         std::cerr << "It must be a boolean\n";
         return false;
       }
-    } else if (key == "saveEnvironment") {
+    } else if (key == "saveOccupancyField") {
       if (value == "0" || value == "false") {
-        config_.saveEnvironment = false;
+        config_.saveOccupancyField = false;
       } else if (value == "1" || value == "true") {
-        config_.saveEnvironment = true;
+        config_.saveOccupancyField = true;
       } else {
         std::cerr << "Invalid value for " << key << ": " << value << '\n';
         std::cerr << "It must be a boolean\n";
@@ -352,6 +368,70 @@ bool ConfigParser::parse(const std::string &filename) {
         std::cerr << "It must be a boolean\n";
         return false;
       }
+    } else if (key == "msfm") {
+      if (value == "0" || value == "false") {
+        config_.msfm = false;
+      } else if (value == "1" || value == "true") {
+        config_.msfm = true;
+      } else {
+        std::cerr << "Invalid value for " << key << ": " << value << '\n';
+        std::cerr << "It must be a boolean\n";
+        return false;
+      }
+    } else if (key == "vbm") {
+      if (value == "0" || value == "false") {
+        config_.vbm = false;
+      } else if (value == "1" || value == "true") {
+        config_.vbm = true;
+      } else {
+        std::cerr << "Invalid value for " << key << ": " << value << '\n';
+        std::cerr << "It must be a boolean\n";
+        return false;
+      }
+    } else if (key == "speedValue") {
+      try {
+        config_.speedValue = std::stod(value);
+      } catch (...) {
+        std::cerr << "Invalid value for " << key << ": " << value << '\n';
+        std::cerr << "It must be a positive double\n";
+        return false;
+      }
+    } else if (key == "visibilityThreshold") {
+      try {
+        config_.visibilityThreshold = std::stod(value);
+      } catch (...) {
+        std::cerr << "Invalid value for " << key << ": " << value << '\n';
+        std::cerr << "It must be a positive double\n";
+        return false;
+      }
+    } else if (key == "saveVisibilityField") {
+      if (value == "0" || value == "false") {
+        config_.saveVisibilityField = false;
+      } else if (value == "1" || value == "true") {
+        config_.saveVisibilityField = true;
+      } else {
+        std::cerr << "Invalid value for " << key << ": " << value << '\n';
+        std::cerr << "It must be a boolean\n";
+        return false;
+      }
+    } else if (key == "saveSpeedField") {
+      if (value == "0" || value == "false") {
+        config_.saveSpeedField = false;
+      } else if (value == "1" || value == "true") {
+        config_.saveSpeedField = true;
+      } else {
+        std::cerr << "Invalid value for " << key << ": " << value << '\n';
+        std::cerr << "It must be a boolean\n";
+        return false;
+      }
+    } else if (key == "ballRadius") {
+      try {
+        config_.ballRadius = std::stoi(value);
+      } catch (...) {
+        std::cerr << "Invalid value for " << key << ": " << value << '\n';
+        std::cerr << "It must be an integer\n";
+        return false;
+      }
     } else {
       std::cerr << "Invalid/Irrelevant key: " << key << '\n';
       std::cerr << "Ignoring...\n";
@@ -412,7 +492,7 @@ bool ConfigParser::parse(const std::string &filename) {
                  "############################## \n"
               << "timer: " << config_.timer << "\n"
               << "saveResults: " << config_.saveResults << "\n"
-              << "saveEnvironment: " << config_.saveEnvironment << "\n"
+              << "saveOccupancyField: " << config_.saveOccupancyField << "\n"
               << "savegScore: " << config_.savegScore << "\n"
               << "savePivots: " << config_.savePivots << "\n"
               << "saveCameFrom: " << config_.saveCameFrom << std::endl;

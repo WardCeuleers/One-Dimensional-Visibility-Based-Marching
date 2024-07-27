@@ -290,8 +290,12 @@ void Solver::processJump(searchdir dir, int& x, int& y, const int primaryDist, c
       return;
   }
    // check for valid path to point behind object
-  if (getDistance(x, y, dir.first, true) == infinity)
+  if (getDistance(x, y, dir.first, true) == infinity) {
+    if (sharedConfig_->debugCardinalSearch) {
+      std::cout << "  -> backside was not next to an point with a distance\n";
+    }
     return;
+  }
   // scan for other objects on the jump line
   while(marchDist <= maxMarchDist) {
     int x_cur = x;
