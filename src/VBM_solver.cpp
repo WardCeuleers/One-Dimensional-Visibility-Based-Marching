@@ -190,8 +190,7 @@ void VBM_Solver::visibilityBasedSolver() {
                  "######################"
               << std::endl;
     if (sharedConfig_->timer) {
-      std::cout << "Execution time in us: " << executionDuration << "us"
-                << std::endl;
+      std::cout << "Execution time in us: " << executionDuration << std::endl;
       std::cout << "Load factor: " << visibilityHashMap_.load_factor()
                 << std::endl;
       std::cout << "Iterations: " << nb_of_iterations_ << std::endl;

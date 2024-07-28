@@ -216,8 +216,7 @@ void Solver::visibilityBasedSolver() {
 
   if (!sharedConfig_->silent) {
     if (sharedConfig_->timer) {
-      std::cout << "Execution time in us: " << executionDuration << "us"
-                << std::endl;
+      std::cout << "Execution time in us: " << executionDuration << std::endl;
       std::cout << "Nb of iterations: " << nb_of_iterations_ << std::endl;
       std::cout << "Nb of marches: " << nb_of_marches_ << std::endl;
       std::cout << "Nb of sources: " << nb_of_pivots_ << std::endl;

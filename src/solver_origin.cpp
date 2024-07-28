@@ -163,7 +163,7 @@ int Solver::advancePrimaryVisibility(searchdir dir, int& x, int& y, int& primary
     onFirstPrimary = false;
     secondaryDist++;
     // check for valid path to the next point
-    if (getDistance(x, y, dir.first, true) == infinity) 
+    if (checkBackwards(x, y, dir.first)) 
       return 2;
   }
   // check for object at end of march
@@ -487,9 +487,9 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
     else 
       return;
     }
-  // stop if there is not a vallid path to this start position
-  if (getDistance(x_pri, y_pri, dir.first, true) == infinity)
-    return;
+  // // stop if there is not a vallid path to this start position
+  // if (getDistance(x_pri, y_pri, dir.first, true) == infinity)
+  //   return;
   // assign distance value to first valid position
   if (onVisibleSide(dir.second, primaryDist, secondaryDist, startSlope, false)) {
     gScore_(x_pri,y_pri) = evaluateDistance(x_pri,y_pri,x_,y_);
@@ -575,8 +575,9 @@ void Solver::ComputeDistanceBetweenSlopes(searchdir dir, int x_start, int y_star
       // check if there is a continous path between the start and stop slope
       if (checkValidPathBack(dir.first, dir.second, x_sec, y_sec, primaryDist, startSlope, blockSlope, {x_, y_}))
         processMarchOver(dir, x_sec, y_sec, blockSlope, secondaryDist+visibilityDist-prevVisibilityDist);
-      else 
+      else {
         processMarchOver(dir, x_sec, y_sec, blockSlope, secondaryDist+visibilityDist-prevVisibilityDist, startSlope);
+      }
     } 
   // __marchOver: same line of sight or stop line __
     else if (marchOverBlock) {}

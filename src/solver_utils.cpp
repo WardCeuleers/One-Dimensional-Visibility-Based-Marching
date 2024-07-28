@@ -745,7 +745,8 @@ bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondar
   int primParentPivotDist = slopeParent == nullPoint_ ? 0 : evaluateCardinalDistance(primaryDir, slopeParent, pivot);
   int secParentPivotDist = slopeParent == nullPoint_ ? 0 : evaluateCardinalDistance(secondaryDir, slopeParent, pivot);
   int secondaryDist;       // secondary axis of the last visible point on the given primary axis  
-  int startVisibleDist;    // primary dist of the first visible point behind the startslope on the current secondary axis
+  int startVisibleDist;    // primary dist of the last visible point before the startslope on the current secondary axis
+  int blockVisibleDist;    // primary dist of the first visible point behind the block slope on the next secondary axis
   switch (secondaryDir) {
     case cardir::North:
     case cardir::South:
@@ -757,7 +758,8 @@ bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondar
       if (startVisibleDist > primParentPivotDist + distanceToEdge(primaryDir, pivot.first, pivot.second))
         return true;
       // check startVisibleDist is larger then distance to first visble point on next secondary axis
-      return (startVisibleDist - primParentPivotDist > ceil((secondaryDist + 1)*blockSlope));
+      blockVisibleDist = ceil((secondaryDist + 1)*blockSlope);
+      return (startVisibleDist + 1 - primParentPivotDist >= blockVisibleDist && blockVisibleDist <= (secondaryDist+1)*startSlope);
     case cardir::East:
     case cardir::West:
       secondaryDist = floor(primaryDist*blockSlope);
@@ -768,7 +770,8 @@ bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondar
       if (startVisibleDist > primParentPivotDist + distanceToEdge(primaryDir, pivot.first, pivot.second))
         return true;
       // check for valid path between slopes
-      return (startVisibleDist - primParentPivotDist > ceil((secondaryDist + 1)/blockSlope));
+      blockVisibleDist = ceil((secondaryDist + 1)/blockSlope);
+      return (startVisibleDist+1 - primParentPivotDist >= blockVisibleDist && blockVisibleDist <= (secondaryDist+1)/startSlope);
     default:
       std::cout << "Invalid direction while checking for a Valid MarchOver Path\n";
       return false;
@@ -780,7 +783,8 @@ bool Solver::checkValidPathBack(const cardir& primaryDir, const cardir& secondar
 bool Solver::checkValidPathFront(const cardir& primaryDir, const cardir& secondaryDir, const int& x, const int& y, const int& secondaryDist, const float& blockSlope, const float& stopSlope, const point& pivot) {
   if (stopSlope == infinity) {return true;}
   int primaryDist;       // primary axis of the last visible point on the given secondary axis  
-  int stopVisibleDist;  // secondary dist of the first visible point before the stop slope on the current primary axis
+  int stopVisibleDist;   // secondary dist of the first visible point before the stop slope on the current primary axis
+  int blockVisibleDist;  // secondary dist of the first visible point behind the block slope on the next primary axis
   switch (secondaryDir) {
     case cardir::North:
     case cardir::South:
@@ -792,7 +796,8 @@ bool Solver::checkValidPathFront(const cardir& primaryDir, const cardir& seconda
       if (stopVisibleDist > distanceToEdge(secondaryDir, pivot.first, pivot.second))
         return true;
       // check startVisibleDist is larger then distance to first visble point on next secondary axis
-      return (stopVisibleDist > ceil((primaryDist + 1)/blockSlope));
+      blockVisibleDist = ceil((primaryDist + 1)/blockSlope);
+      return (stopVisibleDist + 1 >= blockVisibleDist && blockVisibleDist <= (primaryDist+1)/stopSlope);
     case cardir::East:
     case cardir::West:
       primaryDist = floor(secondaryDist/blockSlope);
@@ -803,7 +808,8 @@ bool Solver::checkValidPathFront(const cardir& primaryDir, const cardir& seconda
       if (stopVisibleDist > distanceToEdge(secondaryDir, pivot.first, pivot.second))
         return true;
       // check startVisibleDist is larger then distance to first visble point on next secondary axis
-      return (stopVisibleDist > ceil((primaryDist + 1)*blockSlope));
+      blockVisibleDist = ceil((primaryDist + 1)*blockSlope);
+      return (stopVisibleDist + 1 >= blockVisibleDist && blockVisibleDist <= (primaryDist+1)*stopSlope);
     default:
       std::cout << "Invalid direction while checking for a Valid path front\n";
       return false;

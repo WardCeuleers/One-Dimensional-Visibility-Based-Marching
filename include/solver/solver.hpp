@@ -168,7 +168,7 @@ private:
   // ========= visibility march functions ==========================================================================
   void createNewPivot(const point pivot, const point parent, const cardir primaryDirt, const cardir secondaryDir, float slope, bool adaptedSlope);
   void addNextStraightPrimary(const double& distance, int x, int y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, bool OnVisibleSide);
-  bool setSlopePrimaryDistance(const double& distance, const int& x, const int& y, const point& pivot, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist);
+  bool setSlopePrimaryDistance(const bool& fromVisible, int& x, int& y, const point& pivot, const cardir& primaryDir, const cardir& secondaryDir, int& primaryDist, int& secondaryDist, const float& slope, const bool& slopeFromParent, const point& parent);
   bool addNextSlopePrimary(int x, int y, const cardir& primaryDir, const cardir& secondaryDir, int primaryDist, int secondaryDist, float& slope, bool fromVisiblePoint, bool slopeFromParent);
   bool advanceSecondaryNode(double& distance, int& x, int& y, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist,  int& secondaryDist, const float& slope, const bool& fromPivotSlope, bool onVisibleSide=true, bool checkStartBound=true);
   bool processBoundaryPoint(int& x, int& y, const double& distance, const point& pivot, const cardir& primaryDir, const cardir& secondaryDir, const int& primaryDist, const int& secondaryDist, const float& slope, float blockslope, point& block, const bool& fromPivotSlope, bool adaptedSlope);
