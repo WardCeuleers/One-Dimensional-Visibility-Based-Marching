@@ -65,14 +65,14 @@ void Environment::generateNewEnvironmentFromSettings() {
   std::srand(seedValue);
 
   for (int i = 0; i < sharedConfig_->nb_of_obstacles; ++i) {
-    int col_1 = 1 + (std::rand() % (nx_ - 0 + 1));
+    int col_1 = (std::rand() % (nx_ - 0 + 1));
     int col_2 =
         col_1 + sharedConfig_->minWidth +
         (std::rand() % (sharedConfig_->maxWidth - sharedConfig_->minWidth + 1));
     col_1 = std::min(col_1, (int)nx_ - 1);
     col_2 = std::min(col_2, (int)nx_ - 1);
 
-    int row_1 = 1 + (std::rand() % (ny_ - 0 + 1));
+    int row_1 = (std::rand() % (ny_ - 0 + 1));
     int row_2 = row_1 + sharedConfig_->minHeight +
                 (std::rand() %
                  (sharedConfig_->maxHeight - sharedConfig_->minHeight + 1));

@@ -16,7 +16,7 @@ void Solver::createNewPivot(const point pivot, const point parent, const cardir 
   }
 // 1) Add pivot to the pivot list
   pivots_[nb_of_pivots_] = pivot;
-  ++nb_of_pivots_;
+  nb_of_pivots_++;
   pivotDir_(pivot.first, pivot.second) = {primaryDir, secondaryDir};
   if (sharedConfig_->debugPivotSearch && nb_of_iterations_ == max_nb_of_iter_) {
     std::cout << "  - direction: " << cardir_to_string(primaryDir) << ", " << cardir_to_string(secondaryDir) << std::endl;

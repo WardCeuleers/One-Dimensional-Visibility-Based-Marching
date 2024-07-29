@@ -39,6 +39,7 @@ public:
   ~Solver() = default;
 
   void visibilityBasedSolver();
+  void addInitialPoint(const int& x, const int& y) const;
   // march control functions
   void increaseMaxIter() { max_nb_of_iter_ += marchStepSize_;};
   void decreaseMaxIter() { max_nb_of_iter_ = max_nb_of_iter_ >= marchStepSize_ ? max_nb_of_iter_ -= marchStepSize_ : 0;};

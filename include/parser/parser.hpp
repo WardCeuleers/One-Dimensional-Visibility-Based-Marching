@@ -21,9 +21,9 @@ struct Config {
   int seedValue = 0;
   std::vector<int> objectList;
   std::string imagePath = "C:\\..."; // or /home/...
+  bool originSolver = true;
   bool marchControl = false;
-  int pos_x;
-  int pos_y;
+  std::vector<int> initialFrontline;
   int target_x;
   int target_y;
   bool timer = true;
@@ -43,7 +43,7 @@ struct Config {
   int pivotColorGridSize = 16;
   bool colorBoundaries = false;
   bool colorCameFrom = true;
-  bool msfm = false;
+  bool vbd = false;
   bool vbm = false;
   // parameters for vbm
   float speedValue = 2.0;

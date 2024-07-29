@@ -3,6 +3,9 @@
 #include <thread>
 #include <chrono>
 
+#include <filesystem>
+#include <fstream>
+
 #include "environment/environment.hpp"
 #include "solver/solver.hpp"
 #include "solver/VBM_solver.hpp"
@@ -128,6 +131,7 @@ int main() {
                  "########################## \n";
     std::cout << "Config file parsed successfully \n" << std::endl;
   }
+
   auto config = parser.getConfig();
 
   vbd::Environment env = vbd::Environment(config);

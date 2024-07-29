@@ -52,10 +52,6 @@ Solver::Solver(Environment &env)
 /*****************************************************************************/
 /*****************************************************************************/
 void Solver::reset() {
-  // set the starting location
-  x_ = sharedConfig_->pos_x;
-  y_ = ny_ - 1 - sharedConfig_->pos_y;
-  startPoint_ = point(x_, y_);
   nullPoint_ = point(0, ny_+1);
   nullidx_ = indexAt(0, ny_+1);
   endPoint_ = nullPoint_;
@@ -71,7 +67,7 @@ void Solver::reset() {
 
   // Reserve heaps
   std::vector<Node> container;
-  container.reserve(nx_ * ny_ / 2);
+  container.reserve(nx_ * ny_);
   std::priority_queue<Node, std::vector<Node>, std::less<Node>> heap(
       std::less<Node>(), std::move(container));
   openSet_ = std::make_unique<std::priority_queue<Node>>(heap);
@@ -80,15 +76,12 @@ void Solver::reset() {
   nb_of_iterations_ = 0;
   nb_of_marches_ = 0;
   nb_of_pivots_ = 0;
-  // Set initial lightsource
-  gScore_(x_, y_) = 0; 
-  cameFrom_(x_, y_) = startPoint_;
 }
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
 void Solver::visibilityBasedSolver() {
-  if (!sharedConfig_->silent) {
+  if (sharedConfig_->silent) {
         std::cout << "###################### VBD solver output "
                  "######################"
               << std::endl;
@@ -96,8 +89,75 @@ void Solver::visibilityBasedSolver() {
   reset();
   auto startTime = std::chrono::high_resolution_clock::now();
   
+  auto &initial_frontline = sharedConfig_->initialFrontline;
+
+  // verify that the initial frontline is valid
+  if (initial_frontline.size() % 2 != 0) {
+    std::cout << "###################### Visibility-based solver output "
+                "######################"
+              << std::endl;
+    std::cout << "Initial frontline must be of size that is a multiple of 2 "
+                "for visibility-based solver"
+              << std::endl;
+    return;
+  }
+  else if (sharedConfig_->originSolver && initial_frontline.size() != 2) {
+      std::cout << "###################### Visibility-based solver output "
+                  "######################"
+                << std::endl;
+      std::cout << "Initial frontline can only contain one point for the use of the origin solver"
+                << std::endl;
+      return;
+  }
+
+  for (size_t i = 0; i < initial_frontline.size(); i += 2) {
+    int x = initial_frontline[i];
+    int y = ny_ - 1 - initial_frontline[i + 1];
+    // check if starting positions are inside the map
+    if (x >= nx_ || y >= ny_ || x < 0 || y < 0) {
+      std::cout << "###################### Visibility-based solver output "
+                  "######################"
+                << std::endl;
+      std::cout << "At least one of the starting positions is outside the map"
+                << std::endl;
+      return;
+    }
+
+    if (sharedOccupancyField_->get(x, y) == 1) {
+      std::cout << "###################### Visibility-based solver output "
+                  "######################"
+                << std::endl;
+      std::cout << "At least one of the starting positions is invalid/occupied" << x << " " << y
+                << std::endl;
+      return;
+    }
+  }
+
   // Origin Visiblity
+  if (sharedConfig_->originSolver) {
+    x_ = initial_frontline[0];
+    y_ = ny_ - 1 - initial_frontline[1];
+    startPoint_ = point(x_, y_);
+    gScore_(x_, y_) = 0; 
+    cameFrom_(x_, y_) = startPoint_;
     ComputeOriginVisibility();
+  }
+  else {
+    for (size_t i = 0; i < initial_frontline.size(); i += 2) {
+      int x = initial_frontline[i];
+      int y = ny_ - 1 - initial_frontline[i + 1];
+      gScore_(x, y) = 0; 
+      cameFrom_(x, y) = {x, y};
+      openSet_->push(Node(0, 0, x, y, cardir::North, cardir::East, 0, 0, 0, false ));
+      openSet_->push(Node(1, 0, x, y, cardir::North, cardir::East, 0, 0, 0, false ));
+      openSet_->push(Node(0, 0, x, y, cardir::East, cardir::South, 0, 0, 0, false ));
+      openSet_->push(Node(1, 0, x, y, cardir::East, cardir::South, 0, 0, 0, false ));
+      openSet_->push(Node(0, 0, x, y, cardir::South, cardir::West, 0, 0, 0, false ));
+      openSet_->push(Node(1, 0, x, y, cardir::South, cardir::West, 0, 0, 0, false ));
+      openSet_->push(Node(0, 0, x, y, cardir::West, cardir::North, 0, 0, 0, false ));
+      openSet_->push(Node(1, 0, x, y, cardir::West, cardir::North, 0, 0, 0, false ));
+    }
+  }
   // Expand search from closest march point
   while(openSet_->size() > 0) {
     if (nb_of_iterations_ >= max_nb_of_iter_) {
@@ -214,13 +274,11 @@ void Solver::visibilityBasedSolver() {
   auto stopTime = std::chrono::high_resolution_clock::now();
   auto executionDuration = durationInMicroseconds(startTime, stopTime);
 
-  if (!sharedConfig_->silent) {
-    if (sharedConfig_->timer) {
-      std::cout << "Execution time in us: " << executionDuration << std::endl;
-      std::cout << "Nb of iterations: " << nb_of_iterations_ << std::endl;
-      std::cout << "Nb of marches: " << nb_of_marches_ << std::endl;
-      std::cout << "Nb of sources: " << nb_of_pivots_ << std::endl;
-    }
+  if (!sharedConfig_->silent && sharedConfig_->timer) {
+    std::cout << "Execution time in us: " << executionDuration << std::endl;
+    std::cout << "Nb of iterations: " << nb_of_iterations_ << std::endl;
+    std::cout << "Nb of marches: " << nb_of_marches_ << std::endl;
+    std::cout << "Nb of sources: " << nb_of_pivots_ << std::endl;
   }
   if (sharedConfig_->saveVisibilityBasedSolverImage) {
     saveVisibilityBasedSolverImage(gScore_);
@@ -360,13 +418,18 @@ void Solver::saveVisibilityBasedSolverImage(const Field<double> &gScore) const {
     }
   }
 }
-// color initial position as a white circle
+// color all initial frontline points as white circle
   int radius = nx_ / 120;
-  for (int i = -radius; i <= radius; ++i) {
-    for (int j = -radius; j <= radius; ++j) {
-      if (i * i + j * j <= radius * radius) {
-        if (x_ + i >= 0 && x_ + i < nx_ && y_ + j >= 0 && y_ + j < ny_) {
-          image.setPixel(x_ + i, y_ + j, sf::Color::White);
+  int x0, y0;
+  for (size_t k = 0; k < sharedConfig_->initialFrontline.size(); k += 2) {
+    x0 = sharedConfig_->initialFrontline[k];
+    y0 = ny_ - 1 - sharedConfig_->initialFrontline[k + 1];
+    for (int i = -radius; i <= radius; ++i) {
+      for (int j = -radius; j <= radius; ++j) {
+        if (i * i + j * j <= radius * radius) {
+          if (x0 + i >= 0 && x0 + i < nx_ && y0 + j >= 0 && y0 + j < ny_) {
+            image.setPixel(x0 + i, y0 + j, sf::Color::White);
+          }
         }
       }
     }

@@ -140,22 +140,8 @@ bool ConfigParser::parse(const std::string &filename) {
         std::cerr << "It must be a positive integer\n";
         return false;
       }
-    } else if (key == "pos_x") {
-      try {
-        config_.pos_x = std::stoi(value);
-      } catch (...) {
-        std::cerr << "Invalid value for " << key << ": " << value << '\n';
-        std::cerr << "It must be a positive integer\n";
-        return false;
-      }
-    } else if (key == "pos_y") {
-      try {
-        config_.pos_y = std::stoi(value);
-      } catch (...) {
-        std::cerr << "Invalid value for " << key << ": " << value << '\n';
-        std::cerr << "It must be a positive integer\n";
-        return false;
-      }
+    } else if (key == "initialFrontline") {
+      config_.initialFrontline = parseVectorString(value);
     } else if (key == "target_x") {
       try {
         config_.target_x = std::stoi(value);
@@ -192,6 +178,16 @@ bool ConfigParser::parse(const std::string &filename) {
       }
     } else if (key == "imagePath") {
       config_.imagePath = value;
+    } else if (key == "originSolver") {
+      if (value == "0" || value == "false") {
+        config_.originSolver = false;
+      } else if (value == "1" || value == "true") {
+        config_.originSolver = true;
+      } else {
+        std::cerr << "Invalid value for " << key << ": " << value << '\n';
+        std::cerr << "It must be a boolean\n";
+        return false;
+      }
     } else if (key == "marchControl") {
       if (value == "0" || value == "false") {
         config_.marchControl = false;
@@ -368,11 +364,11 @@ bool ConfigParser::parse(const std::string &filename) {
         std::cerr << "It must be a boolean\n";
         return false;
       }
-    } else if (key == "msfm") {
+    } else if (key == "vbd") {
       if (value == "0" || value == "false") {
-        config_.msfm = false;
+        config_.vbd = false;
       } else if (value == "1" || value == "true") {
-        config_.msfm = true;
+        config_.vbd = true;
       } else {
         std::cerr << "Invalid value for " << key << ": " << value << '\n';
         std::cerr << "It must be a boolean\n";
@@ -485,8 +481,17 @@ bool ConfigParser::parse(const std::string &filename) {
     std::cout
         << "############################ Solver settings "
            "############################## \n";
-    std::cout << "Robot Position: " << config_.pos_x << ", " << config_.pos_y << "\n"
-              << "max number of iterations: " << config_.max_nb_of_iterations << "\n"
+    std::cout << "Initial frontline: ";
+              for (size_t i = 0; i < config_.initialFrontline.size(); ++i) {
+                std::cout << config_.initialFrontline.at(i);
+                if (i < config_.initialFrontline.size() - 1) {
+                  std::cout << ", ";
+                } else {
+                  std::cout << "\n";
+                }
+              }
+    std::cout << "max number of iterations: " << config_.max_nb_of_iterations << "\n"
+              << "originSolver: " << config_.originSolver << "\n"
               << "marchControl: " << config_.marchControl <<std::endl;
     std::cout << "############################ Output settings "
                  "############################## \n"

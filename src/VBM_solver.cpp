@@ -110,9 +110,44 @@ void VBM_Solver::visibilityBasedSolver() {
   reset();
   auto startTime = std::chrono::high_resolution_clock::now();
 
-  // Init
+// Init
   double d = 0;
-  int x = sharedConfig_->pos_x, y = ny_-1-sharedConfig_->pos_y, neighbour_x = 0, neighbour_y = 0;
+  int x = 0, y = 0, neighbour_x = 0, neighbour_y = 0;
+
+  auto &initial_frontline = sharedConfig_->initialFrontline;
+
+  if (initial_frontline.size() % 2 != 0) {
+    std::cout << "###################### Visibility-based solver output "
+                 "######################"
+              << std::endl;
+    std::cout << "Initial frontline must be of size that is a multiple of 2 "
+                 "for visibility-based solver"
+              << std::endl;
+    return;
+  }
+  for (size_t i = 0; i < initial_frontline.size(); i += 2) {
+    x = initial_frontline[i];
+    y = ny_ - 1 - initial_frontline[i + 1];
+    // check if starting positions are inside the map
+    if (x >= nx_ || y >= ny_) {
+      std::cout << "###################### Visibility-based solver output "
+                   "######################"
+                << std::endl;
+      std::cout << "At least one of the starting positions is outside the map"
+                << std::endl;
+      return;
+    }
+
+    if (sharedVisibilityField_->get(x, y) < 1) {
+      std::cout << "###################### Visibility-based solver output "
+                   "######################"
+                << std::endl;
+      std::cout << "At least one of the starting positions is invalid/occupied"
+                << std::endl;
+      return;
+    }
+
+    d = 0;
     gScore_(x, y) = d;
     updated_(x, y) = true;
     cameFrom_(x, y) = nb_of_sources_;
@@ -123,6 +158,7 @@ void VBM_Solver::visibilityBasedSolver() {
     visibilityHashMap_[key] = lightStrength_;
     ++nb_of_sources_;
     ++nb_of_iterations_;
+  }
 
   // For queing unique sources from neighbours of neighbour
   std::vector<size_t> potentialSources;
@@ -185,17 +221,14 @@ void VBM_Solver::visibilityBasedSolver() {
   auto stopTime = std::chrono::high_resolution_clock::now();
   auto executionDuration = durationInMicroseconds(startTime, stopTime);
 
-  if (!sharedConfig_->silent) {
-    std::cout << "###################### VBM solver output "
-                 "######################"
-              << std::endl;
-    if (sharedConfig_->timer) {
+  if (!sharedConfig_->silent && sharedConfig_->timer) {
+      std::cout << "###################### VBM solver output "
+                 "######################" << std::endl;
       std::cout << "Execution time in us: " << executionDuration << std::endl;
       std::cout << "Load factor: " << visibilityHashMap_.load_factor()
                 << std::endl;
       std::cout << "Iterations: " << nb_of_iterations_ << std::endl;
       std::cout << "Nb of sources: " << nb_of_sources_ << std::endl;
-    }
   }
   if (sharedConfig_->saveResults) {
     saveResults({});
@@ -525,13 +558,15 @@ void VBM_Solver::saveVisibilityBasedSolverImage(const Field<double> &gScore) con
   color.a = 1;
   int x0, y0;
   int radius = 10;
-  x0 = sharedConfig_->pos_x;
-  y0 = ny_ - 1 - sharedConfig_->pos_y;
-  for (int i = -radius; i <= radius; ++i) {
-    for (int j = -radius; j <= radius; ++j) {
-      if (i * i + j * j <= radius * radius) {
-        if (x0 + i >= 0 && x0 + i < nx_ && y0 + j >= 0 && y0 + j < ny_) {
-          image.setPixel(x0 + i, y0 + j, color.Green);
+  for (size_t k = 0; k < sharedConfig_->initialFrontline.size(); k += 2) {
+    x0 = sharedConfig_->initialFrontline[k];
+    y0 = ny_ - 1 - sharedConfig_->initialFrontline[k + 1];
+    for (int i = -radius; i <= radius; ++i) {
+      for (int j = -radius; j <= radius; ++j) {
+        if (i * i + j * j <= radius * radius) {
+          if (x0 + i >= 0 && x0 + i < nx_ && y0 + j >= 0 && y0 + j < ny_) {
+            image.setPixel(x0 + i, y0 + j, color.Green);
+          }
         }
       }
     }
